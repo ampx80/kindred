@@ -9,8 +9,10 @@ import { Typer } from '../components/UI.jsx';
 import { celebrate } from '../lib/celebrate.js';
 import { completeProfile, domainMeta, TONES } from '../lib/store.js';
 import { localNextQuestion } from '../lib/interview-local.js';
+import { screenForCrisis, crisisReply, CRISIS_RESOURCES } from '../lib/safety.js';
+import CrisisCard from '../components/CrisisCard.jsx';
 
-const GREET = "Hi, I'm Aria. I'm really looking forward to getting to know you. No forms, no homework - just a few questions, and we'll find what actually matters to you.";
+const GREET = "Hi, I'm Aria. I'm an AI companion, not a person - but I'm a good listener, and I'm really looking forward to getting to know you. No forms, no homework, just a few questions, and we'll find what actually matters to you.";
 
 async function fetchNext({ name, exchanges }) {
   try {
@@ -72,6 +74,14 @@ export default function Welcome() {
     const nextExchanges = [...exchanges, { q: current.question, a: text }];
     setExchanges(nextExchanges);
     setInput('');
+
+    // Local crisis failsafe during onboarding: works even without the API.
+    if (screenForCrisis(text).crisis) {
+      setCurrent({ question: crisisReply(name), choices: ['I reached out to someone', 'I want to keep going', 'Give me a minute'], depth: current.depth, crisis: true });
+      setTyped(false);
+      return;
+    }
+
     setBusy(true);
     const next = await fetchNext({ name, exchanges: nextExchanges });
     if (next.done && next.profile) {
@@ -155,6 +165,7 @@ export default function Welcome() {
               <div className="wiz-q" key={current.question}>
                 <Typer text={current.question} speed={18} onDone={() => setTyped(true)} />
               </div>
+              {current.crisis && <CrisisCard resources={current.resources || CRISIS_RESOURCES} />}
               <div className="col gap-1" style={{ opacity: typed ? 1 : 0, transition: 'opacity .4s var(--ease)', pointerEvents: typed ? 'auto' : 'none' }}>
                 <div className="col gap-1 stagger" key={current.question + '-choices'}>
                   {(current.choices || []).map((c) => (

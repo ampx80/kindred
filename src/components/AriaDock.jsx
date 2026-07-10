@@ -7,6 +7,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Icon } from './icons.jsx';
+import CrisisCard from './CrisisCard.jsx';
+import { screenForCrisis, crisisReply, CRISIS_RESOURCES } from '../lib/safety.js';
 import { celebrate } from '../lib/celebrate.js';
 import {
   getProfile, getGoals, getCheckins, getJournal, getPeople, getWins, getRecs,
@@ -79,12 +81,14 @@ export default function AriaDock() {
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [listening, setListening] = useState(false);
   const loc = useLocation();
   const navigate = useNavigate();
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
   const recogRef = useRef(null);
+  const lastDiscloseRef = useRef(Date.now());   // NY GBL Art 47: re-disclose non-human status every 3h of continuous engagement
 
   useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, [msgs, busy, open]);
   useEffect(() => { if (open && inputRef.current && window.innerWidth > 860) inputRef.current.focus(); }, [open]);
@@ -120,8 +124,27 @@ export default function AriaDock() {
   const send = useCallback(async (text) => {
     const q = (text ?? input).trim();
     if (!q || busy) return;
-    const next = [...msgs, { role: 'user', content: q }];
-    setMsgs(next); setInput(''); setBusy(true);
+
+    // Periodic non-human disclosure for long continuous sessions (NY law).
+    const preface = [];
+    if (Date.now() - lastDiscloseRef.current > 3 * 60 * 60 * 1000) {
+      lastDiscloseRef.current = Date.now();
+      preface.push({ role: 'assistant', content: 'Quick reminder, since we have been talking a while: I am Aria, an AI companion, not a person. I am glad to be here with you.' });
+    }
+    const next = [...msgs, ...preface, { role: 'user', content: q }];
+    setMsgs(next); setInput('');
+
+    // Client-side crisis failsafe: screen the message locally BEFORE the
+    // network call. If it fires, show care + resources immediately and never
+    // send it into a coaching turn - this works even if the API is down.
+    if (screenForCrisis(q).crisis) {
+      const nm = getProfile()?.name || '';
+      setMsgs(m => [...m, { role: 'assistant', content: crisisReply(nm), crisis: true, resources: CRISIS_RESOURCES,
+        suggestions: ['I reached out to someone', 'Stay with me a minute'] }]);
+      return;
+    }
+
+    setBusy(true);
     try {
       const r = await fetch('/api/companion', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -133,7 +156,7 @@ export default function AriaDock() {
       });
       const data = await r.json();
       if (!r.ok || !data.ok) throw new Error(data.error || 'Aria is unreachable');
-      setMsgs(m => [...m, { role: 'assistant', content: data.reply, nav: data.nav, actions: data.actions || [], suggestions: data.suggestions || [] }]);
+      setMsgs(m => [...m, { role: 'assistant', content: data.reply, nav: data.nav, actions: data.actions || [], suggestions: data.suggestions || [], crisis: !!data.crisis, resources: data.crisis ? (data.resources || CRISIS_RESOURCES) : null }]);
     } catch (e) {
       // Honest degradation: no fabricated coaching. Offer the concrete things
       // that still work offline.
@@ -203,12 +226,28 @@ export default function AriaDock() {
           <div className="aria-head">
             <span className="aria-orb" style={{ width: 34, height: 34 }} aria-hidden />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="aria-head__name">Aria <span className="aria-head__tag">companion</span></div>
-              <div className="aria-head__sub">Remembers everything you share</div>
+              <div className="aria-head__name">Aria <span className="aria-head__tag">AI companion</span></div>
+              <div className="aria-head__sub">An AI, not a person. Here for support.</div>
             </div>
+            <button className="aria-x" onClick={() => setHelpOpen(o => !o)} aria-label="Get real help" title="Get real help now"><Icon name="heart" size={18} /></button>
             <button className={`aria-x${menuOpen ? ' is-active' : ''}`} onClick={() => setMenuOpen(o => !o)} aria-label="What Aria can do" title="What can Aria do?"><Icon name="sparkles" size={18} /></button>
             <button className="aria-x" onClick={() => setOpen(false)} aria-label="Close"><Icon name="x" size={18} /></button>
           </div>
+
+          {helpOpen && (
+            <div className="aria-menu">
+              <div className="aria-menu__head">
+                <span>Get real help now</span>
+                <button className="aria-x" onClick={() => setHelpOpen(false)} aria-label="Back"><Icon name="x" size={16} /></button>
+              </div>
+              <div className="aria-menu__scroll">
+                <p className="muted t-sm" style={{ padding: '0 4px 10px' }}>
+                  Aria is an AI companion, not a therapist or a crisis service. If you are struggling or in danger, reach a real person trained to help:
+                </p>
+                <CrisisCard compact />
+              </div>
+            </div>
+          )}
 
           {menuOpen && (
             <div className="aria-menu">
@@ -240,6 +279,7 @@ export default function AriaDock() {
                 {m.role === 'assistant' && <span className="aria-orb" style={{ width: 22, height: 22, marginTop: 3, boxShadow: 'none' }} aria-hidden />}
                 <div className="aria-bubble">
                   <div style={{ whiteSpace: 'pre-wrap' }}>{m.content}</div>
+                  {m.crisis && <CrisisCard resources={m.resources || CRISIS_RESOURCES} />}
                   {m.draft && (
                     <div className="aria-draft">
                       {m.draft.to && <div className="aria-draft__to">To: {m.draft.to}</div>}

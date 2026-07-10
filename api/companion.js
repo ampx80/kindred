@@ -6,6 +6,7 @@
 // writers do the work. Aria never mutates data herself.
 import { withErrorHandling, methodNotAllowed, readJsonBody } from './_utils.js';
 import { callAnthropic } from './_lib-anthropic.js';
+import { screenForCrisis, crisisPayload, SAFETY_SYSTEM } from './_lib-safety.js';
 
 export const config = { maxDuration: 45 };
 
@@ -38,6 +39,7 @@ const SCHEMA = {
       },
     },
     suggestions: { type: 'array', items: { type: 'string' }, description: '2 to 3 natural things they might say next.' },
+    crisis: { type: 'boolean', description: 'true if the user expressed self-harm, suicidal thoughts, abuse, or being in danger. When true, keep reply to brief care only - no coaching.' },
   },
   required: ['reply', 'actions', 'suggestions'],
 };
@@ -99,7 +101,8 @@ const SYSTEM = (snapText, path, tone) => [
   '- ACTIONS (propose, they confirm): set_goal (small, concrete, cadence daily or weekly, domainId from their domains), log_win, add_person, add_journal (their words, first person), add_rec, check_in, draft_message.',
   '- CALL-OUTS: if they said they would do something and did not, and their tone is coach or challenger, name it honestly. If nurturer, name it softly and shrink the next step.',
   '- Keep reply tight (2-5 sentences). Offer 2-3 suggestions.',
-  'Absolute rule: never use an em dash or en dash. Use a normal hyphen. Never mention being an AI or a model.',
+  '',
+  SAFETY_SYSTEM,
   '',
   'SNAPSHOT:',
   snapText,
@@ -114,6 +117,16 @@ export default withErrorHandling(async (req, res) => {
   const path = body.context?.path || '';
   if (!messages.length) return res.status(400).json({ error: 'messages required' });
 
+  const name = snapshot?.profile?.name || '';
+
+  // Deterministic crisis screen on the latest user message, BEFORE any model
+  // call. This is the failsafe: a crisis must surface human help even if the
+  // Anthropic API is unreachable or the model misses the signal.
+  const lastUser = [...messages].reverse().find(m => m.role === 'user');
+  if (lastUser && screenForCrisis(lastUser.content).crisis) {
+    return res.status(200).json(crisisPayload(name));
+  }
+
   const convo = messages.filter(m => m.role === 'user' || m.role === 'assistant')
     .map(m => `${m.role === 'user' ? 'Them' : 'Aria'}: ${m.content}`).join('\n');
 
@@ -125,8 +138,14 @@ export default withErrorHandling(async (req, res) => {
     model: 'claude-sonnet-4-6',
   });
   const data = out?.data || {};
+  // Model-side crisis flag: honor it even if the deterministic screen did not
+  // fire (catches nuanced phrasing the regex misses).
+  if (data.crisis) {
+    return res.status(200).json({ ...crisisPayload(name), reply: data.reply || crisisPayload(name).reply });
+  }
   return res.status(200).json({
     ok: true,
+    crisis: false,
     reply: data.reply || 'I am here. Tell me what is on your mind.',
     nav: data.nav || null,
     actions: Array.isArray(data.actions) ? data.actions.slice(0, 3) : [],

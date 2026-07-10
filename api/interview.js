@@ -5,6 +5,7 @@
 // "this is you" profile in the same call.
 import { withErrorHandling, methodNotAllowed, readJsonBody } from './_utils.js';
 import { callAnthropic } from './_lib-anthropic.js';
+import { screenForCrisis, crisisReply, CRISIS_RESOURCES } from './_lib-safety.js';
 
 export const config = { maxDuration: 60 };
 
@@ -75,14 +76,34 @@ HOW YOU INTERVIEW:
 
 ABSOLUTE RULES:
 - Never use an em dash or en dash. Use a normal hyphen.
-- Never mention that you are an AI model or how you work. You are just Aria.
-- Never fabricate things they did not say.`;
+- You are Aria, an AI companion. Stay in your warm voice, but if they ask what you are, be honest that you are an AI, not a person. Never claim to be human.
+- Never fabricate things they did not say.
+- If they reveal self-harm, suicidal thoughts, abuse, or danger, do not coach or diagnose. Lead with care and point them to 988 (call or text) and 911 for immediate danger.`;
 
 export default withErrorHandling(async (req, res) => {
   if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
   const body = readJsonBody(req);
   const name = (body.name || '').slice(0, 60);
   const exchanges = Array.isArray(body.exchanges) ? body.exchanges.slice(0, 14) : [];
+
+  // If a crisis signal shows up during onboarding, surface human help
+  // immediately. We keep the interview alive (a gentle continue question) but
+  // lead with care and resources - never coach through it.
+  const lastAnswer = exchanges.length ? exchanges[exchanges.length - 1].a : '';
+  if (lastAnswer && screenForCrisis(lastAnswer).crisis) {
+    return res.status(200).json({
+      ok: true,
+      crisis: true,
+      question: crisisReply(name),
+      resources: CRISIS_RESOURCES,
+      choices: ['I reached out to someone', 'I want to keep going', 'Give me a minute'],
+      domainsSensed: [],
+      toneSignal: 'nurturer',
+      depth: Math.min(60, exchanges.length * 10),
+      done: false,
+      profile: null,
+    });
+  }
 
   const transcript = exchanges.length
     ? exchanges.map((e, i) => `Q${i + 1} (Aria): ${e.q}\nA${i + 1} (${name || 'them'}): ${e.a}`).join('\n')
