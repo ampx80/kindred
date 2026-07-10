@@ -5,8 +5,9 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Card, Badge, useToast, longDate } from '../components/UI.jsx';
 import { Icon } from '../components/icons.jsx';
 import { celebrate } from '../lib/celebrate.js';
-import { useStore, getTodayCheckin, todaysMoves, addCheckin, markGoalDone, throwback, getRecs } from '../lib/store.js';
+import { useStore, getTodayCheckin, todaysMoves, addCheckin, markGoalDone, throwback, getRecs, peopleNeedingTouch } from '../lib/store.js';
 import { dailyMessage } from '../lib/daily.js';
+import { speak, speechAvailable } from '../lib/voice.js';
 
 const MOODS = [
   { v: 1, e: '🌧️', label: 'Heavy' },
@@ -19,6 +20,7 @@ const MOODS = [
 export default function Today() {
   const profile = useStore(s => s.profile);
   useStore(s => s.checkins); useStore(s => s.goals); useStore(s => s.people); useStore(s => s.recs);
+  const settings = useStore(s => s.settings);
   const toast = useToast();
   const nav = useNavigate();
   const [note, setNote] = useState('');
@@ -29,6 +31,10 @@ export default function Today() {
   const msg = dailyMessage();
   const tb = throwback();
   const openRecs = getRecs().filter(r => !r.done);
+  // Anti-dependency: gently push toward a real person, not more time with Aria.
+  // Not every day (rotates), and it leans on someone who actually matters to them.
+  const reachPerson = peopleNeedingTouch()[0];
+  const showReconnect = reachPerson && (new Date().getDate() % 2 === 0 || (today && today.mood <= 2));
 
   const checkIn = (v) => {
     const r = addCheckin({ mood: v, note });
@@ -43,6 +49,7 @@ export default function Today() {
       const r = markGoalDone(m.id);
       if (r.error) return toast(r.message, 'warn');
       if (r.milestone) { celebrate({ count: 140 }); toast(`${r.milestone} in a row. That is a milestone.`); }
+      else if (r.graceApplied) { celebrate({ count: 60, y: window.innerHeight * .5 }); toast('You missed a day and I kept your streak. Everyone misses one. Back at it.'); }
       else { celebrate({ count: 60, y: window.innerHeight * .5 }); toast('Counted. Momentum is yours.'); }
     } else {
       nav(m.to);
@@ -64,9 +71,29 @@ export default function Today() {
           <div className="row gap-2" style={{ alignItems: 'flex-start' }}>
             <span className="aria-orb" style={{ width: 40, height: 40, marginTop: 2 }} aria-hidden />
             <div className="col" style={{ gap: '.3rem', minWidth: 0 }}>
-              <span className="t-xs fw-7 muted" style={{ letterSpacing: '.07em', textTransform: 'uppercase' }}>From Aria</span>
+              <div className="row between gap-2">
+                <span className="t-xs fw-7 muted" style={{ letterSpacing: '.07em', textTransform: 'uppercase' }}>From Aria</span>
+                {speechAvailable() && (
+                  <button className="btn btn-ghost btn-sm" onClick={() => speak(msg)} aria-label="Hear this from Aria" title="Hear it"><Icon name="volume" size={15} /></button>
+                )}
+              </div>
               <p className="serif" style={{ fontSize: '1.14rem', lineHeight: 1.6, margin: 0 }}>{msg}</p>
             </div>
+          </div>
+        </Card>
+      )}
+
+      {showReconnect && (
+        <Card className="card-pad" style={{ borderColor: 'var(--rose)', background: 'var(--rose-bg)' }}>
+          <div className="row gap-2 between wrap" style={{ alignItems: 'center' }}>
+            <div className="row gap-2" style={{ alignItems: 'flex-start', minWidth: 0, flex: 1 }}>
+              <Icon name="heart" size={20} style={{ color: 'var(--rose)', flexShrink: 0, marginTop: 3 }} />
+              <div className="col" style={{ gap: '.2rem', minWidth: 0 }}>
+                <span className="fw-6">I am glad you are here, and I am not a substitute for the people who love you.</span>
+                <span className="muted t-sm clip">{reachPerson.name} has not heard from you in a while. That is worth more than another minute with me.</span>
+              </div>
+            </div>
+            <button className="btn btn-ghost btn-sm" onClick={() => nav(`/people/${reachPerson.id}`)}>Reach {reachPerson.name.split(' ')[0]}</button>
           </div>
         </Card>
       )}

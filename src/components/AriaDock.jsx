@@ -10,9 +10,10 @@ import { Icon } from './icons.jsx';
 import CrisisCard from './CrisisCard.jsx';
 import { screenForCrisis, crisisReply, CRISIS_RESOURCES } from '../lib/safety.js';
 import { celebrate } from '../lib/celebrate.js';
+import { speak, speechAvailable } from '../lib/voice.js';
 import {
   getProfile, getGoals, getCheckins, getJournal, getPeople, getWins, getRecs,
-  getMessages, saveMessages, getTodayCheckin,
+  getMessages, saveMessages, getTodayCheckin, getSettings,
   addGoal, addWin, addPerson, addJournal, addRec, addCheckin,
 } from '../lib/store.js';
 
@@ -157,6 +158,7 @@ export default function AriaDock() {
       const data = await r.json();
       if (!r.ok || !data.ok) throw new Error(data.error || 'Aria is unreachable');
       setMsgs(m => [...m, { role: 'assistant', content: data.reply, nav: data.nav, actions: data.actions || [], suggestions: data.suggestions || [], crisis: !!data.crisis, resources: data.crisis ? (data.resources || CRISIS_RESOURCES) : null }]);
+      if (data.reply && speechAvailable() && getSettings()?.voiceOn) speak(data.reply);
     } catch (e) {
       // Honest degradation: no fabricated coaching. Offer the concrete things
       // that still work offline.

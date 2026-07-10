@@ -1,0 +1,16 @@
+{
+  "name": "Kindred - your life, with company",
+  "short_name": "Kindred",
+  "description": "A warm companion that learns who you are, organizes your whole life, and walks with you toward it.",
+  "start_url": "/today",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#faf5ef",
+  "theme_color": "#faf5ef",
+  "categories": ["health", "lifestyle", "productivity"],
+  "icons": [
+    { "src": "/brand/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/brand/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

@@ -5,6 +5,7 @@
 // persists to localStorage, Supabase-swappable: every function carries a
 // `// SUPABASE:` note describing the live equivalent.
 import { useEffect, useState } from 'react';
+import { track } from './analytics.js';
 
 const LS_KEY = 'kindred_state_v1';   // bump to force a clean reseed
 
@@ -67,6 +68,14 @@ function commit(next) {
   subs.forEach(fn => fn(state));
 }
 export function resetStore() { try { localStorage.removeItem(LS_KEY); } catch {} state = blank(); subs.forEach(fn => fn(state)); }
+
+/* Sync hooks (used by lib/sync.js for the durable server layer). */
+export function subscribe(fn) { subs.add(fn); return () => subs.delete(fn); }
+export function snapshot() { return state; }
+// Replace local state with a server blob (on sign-in restore). Merges over a
+// blank base so older server blobs missing new keys still hydrate cleanly.
+export function hydrate(next) { if (next && typeof next === 'object') commit({ ...blank(), ...next }); }
+export function exportData() { return JSON.stringify(state, null, 2); }
 
 /* React hook: reactive snapshot of the store */
 export function useStore(selector = (s) => s) {
@@ -164,6 +173,7 @@ export function completeProfile(profile) {
     goals: [...state.goals, ...goals],
     wins: [...state.wins, { id: uid(), at: nowIso(), title: 'Met Aria and mapped your life', detail: 'The day this started.', domainId: profile.domains[0]?.id || 'purpose' }],
   });
+  track('interview_complete');
   return { profile: state.profile };
 }
 
@@ -187,19 +197,45 @@ export function addGoal({ title, domainId, why = '', cadence = 'daily' }) {
 }
 
 // SUPABASE: update goals set streak/lastDoneAt; insert into wins on milestones
+// Non-punitive streaks: one missed period does NOT reset a streak to 1. Each
+// streak run carries a single "grace" (a streak freeze). Miss one day (or one
+// week) and the grace absorbs it so the streak holds; miss again before earning
+// it back, or miss by more than the grace window, and it resets kindly. Punitive
+// streaks are a documented harm vector and they churn people - this is gentler
+// and it retains better.
 export function markGoalDone(id) {
   const g = state.goals.find(x => x.id === id);
   if (!g) return { error: true, message: 'That goal is gone.' };
   const today = todayStr();
   if (g.lastDoneAt && g.lastDoneAt.slice(0, 10) === today) return { error: true, message: 'Already counted today. Tomorrow is the next rep.' };
+
+  const onTime = g.cadence === 'daily' ? 1 : 8;   // gap that counts as "kept up"
+  const graceWindow = g.cadence === 'daily' ? 2 : 15;   // one missed period is forgivable
   let streak = 1;
+  let graceUsedAt = g.graceUsedAt || null;
+  let graceApplied = false;
+
   if (g.lastDoneAt) {
     const gap = Math.floor((new Date(today) - new Date(g.lastDoneAt.slice(0, 10))) / 86400000);
-    const window = g.cadence === 'daily' ? 1 : 8;
-    streak = gap <= window ? g.streak + 1 : 1;
+    if (gap <= onTime) {
+      streak = g.streak + 1;                        // kept the rhythm
+    } else if (gap <= graceWindow && !graceUsedAt) {
+      streak = g.streak + 1;                        // one slip, grace absorbs it
+      graceUsedAt = today; graceApplied = true;
+    } else {
+      streak = 1; graceUsedAt = null;               // reset, grace refreshes for the new run
+    }
+  } else {
+    graceUsedAt = null;
   }
+  // Earn the grace back after a clean stretch since it was last used.
+  if (graceUsedAt && !graceApplied) {
+    const sinceGrace = Math.floor((new Date(today) - new Date(graceUsedAt)) / 86400000);
+    if (sinceGrace >= (g.cadence === 'daily' ? 7 : 28)) graceUsedAt = null;
+  }
+
   const best = Math.max(streak, g.best || 0);
-  const goals = state.goals.map(x => x.id === id ? { ...x, streak, best, lastDoneAt: nowIso() } : x);
+  const goals = state.goals.map(x => x.id === id ? { ...x, streak, best, lastDoneAt: nowIso(), graceUsedAt } : x);
   let wins = state.wins;
   let milestone = null;
   if ([3, 7, 14, 30, 60, 100].includes(streak)) {
@@ -207,7 +243,8 @@ export function markGoalDone(id) {
     wins = [...wins, { id: uid(), at: nowIso(), title: `${streak} in a row: ${g.title}`, detail: 'A streak milestone.', domainId: g.domainId }];
   }
   commit({ ...state, goals, wins });
-  return { goal: goals.find(x => x.id === id), milestone };
+  track('goal_done');
+  return { goal: goals.find(x => x.id === id), milestone, graceApplied };
 }
 
 // SUPABASE: update goals set status
@@ -228,6 +265,7 @@ export function addCheckin({ mood, note = '' }) {
     ? state.checkins.map(c => c.date === date ? { ...c, mood: m, note: note || c.note } : c)
     : [...state.checkins, { id: uid(), date, mood: m, note }];
   commit({ ...state, checkins });
+  track('checkin');
   return { checkin: checkins.find(c => c.date === date) };
 }
 

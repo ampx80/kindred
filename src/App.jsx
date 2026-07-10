@@ -14,8 +14,9 @@ import People from './pages/People.jsx';
 import PersonDetail from './pages/PersonDetail.jsx';
 import ForYou from './pages/ForYou.jsx';
 import Growth from './pages/Growth.jsx';
+import Settings from './pages/Settings.jsx';
 
-const APP_SEGS = new Set(['today', 'paths', 'journal', 'people', 'foryou', 'growth']);
+const APP_SEGS = new Set(['today', 'paths', 'journal', 'people', 'foryou', 'growth', 'settings']);
 
 const NAV = [
   { to: '/today', label: 'Today', icon: 'sun' },
@@ -48,6 +49,10 @@ function Rail() {
         ))}
       </nav>
       <div className="col gap-1" style={{ padding: '.9rem .8rem', borderTop: '1px solid var(--line)' }}>
+        <NavLink to="/settings" className={({ isActive }) => `kd-nav-item${isActive ? ' active' : ''}`}>
+          <Icon name="settings" size={18} />
+          <span>Settings</span>
+        </NavLink>
         <button className="kd-nav-item" onClick={toggleTheme} style={{ border: 'none', background: 'transparent', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
           <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={18} />
           <span>{theme === 'dark' ? 'Morning light' : 'Candlelight'}</span>
@@ -133,6 +138,7 @@ export default function App() {
               <Route path="/people/:id" element={<PersonDetail />} />
               <Route path="/foryou" element={<ForYou />} />
               <Route path="/growth" element={<Growth />} />
+              <Route path="/settings" element={<Settings />} />
               <Route path="*" element={<Navigate to="/today" replace />} />
             </Routes>
           </div>
