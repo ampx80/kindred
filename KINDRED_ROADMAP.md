@@ -106,8 +106,25 @@ them, be safe and legal to talk to, and eventually be paid for. The magic
 ### Phase 0 - Safe and legal to talk to. DONE 2026-07-10.
 Shipped this session. Kindred is now defensible to operate.
 
-### Phase 1 - "It survives you." (persistence + reach + accounts)
-The existential phase. Ship these together; they interlock.
+### Phase 1 - "It survives you." SHIPPED 2026-07-10.
+Done this session. The existential risk is closed: your life now lives on the
+server, not only in one browser.
+- Email + password accounts via our own /api (scrypt + HMAC token, node:crypto
+  only - no client anon key or email provider needed yet; magic link is a later
+  upgrade). `api/auth.js`, `api/_lib-account.js`.
+- Durable record: `kindred_accounts` + `kindred_states` (the store is one JSON
+  blob, so sync = push/pull that blob). `api/state.js`, `api/_lib-db.js`
+  (postgres, pooler URL, prepare:false for pgbouncer). Client `lib/account.js` +
+  `lib/sync.js`: pull on sign-in (server wins if it holds a real life, else local
+  seeds the server), debounced push on every change.
+- PWA installable (manifest + service worker, never caches /api) + web push
+  (VAPID) + a daily nudge cron. Local-first stays the anonymous default.
+- VERIFIED in production: signup, cross-device restore (pushed a life, logged in
+  fresh, it all came back), wrong-password 401, duplicate 409, cascade delete,
+  live bundle hash == source. Gotcha fixed: Supabase direct `db.*` host is
+  deprecated for serverless (ENOTFOUND on Vercel); must use the pooler URL.
+
+### Phase 1 (original notes) - persistence + reach + accounts
 - **Auth:** magic-link / email (Supabase Auth). Low-friction, no passwords.
 - **Persistence:** migrate the local-first store to Supabase (`kindred_*`
   tables). The store already carries `// SUPABASE:` notes on every read/write,
