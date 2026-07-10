@@ -5,6 +5,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Card, Button, SectionHeader, Ring, useToast } from '../components/UI.jsx';
 import { Icon } from '../components/icons.jsx';
 import FeatureRunner from '../components/FeatureRunner.jsx';
+import BalanceOrbit from '../components/BalanceOrbit.jsx';
 import { mdToHtml } from '../lib/markdown.js';
 import { getFeature } from '../lib/features.js';
 import {
@@ -27,25 +28,29 @@ function Tracker({ feature }) {
     return (
       <div className="col gap-3">
         <Card pad={24}>
-          <div className="row gap-3 wrap" style={{ alignItems: 'center' }}>
-            <Ring value={lb.overall} size={120} color={scoreColor(lb.overall)} label={`${lb.overall}`} />
-            <div className="col" style={{ gap: '.3rem', minWidth: 200, flex: 1 }}>
-              <h2 style={{ margin: 0 }}>Your life balance is {lb.overall >= 70 ? 'strong' : lb.overall >= 40 ? 'finding its footing' : 'asking for attention'}</h2>
-              <p className="muted" style={{ margin: 0 }}>A real number from how you are actually showing up across the areas you said matter, plus how you have been feeling. It moves as you do.</p>
+          <div className="k-balance">
+            <BalanceOrbit perDomain={lb.perDomain} overall={lb.overall} />
+            <div className="col" style={{ gap: '.9rem', minWidth: 0 }}>
+              <div className="col" style={{ gap: '.3rem' }}>
+                <span className="eyebrow">Life balance</span>
+                <h2 style={{ margin: 0 }}>Your life balance is {lb.overall >= 70 ? 'strong' : lb.overall >= 40 ? 'finding its footing' : 'asking for attention'}</h2>
+                <p className="muted" style={{ margin: '.2rem 0 0' }}>A real number from how you are actually showing up across the areas you said matter, plus how you have been feeling. It moves as you do.</p>
+              </div>
+              <div className="col gap-1">
+                {lb.perDomain.map(d => (
+                  <div key={d.id} className="k-dom-card">
+                    <Ring value={d.score / 100} size={46} color={scoreColor(d.score)} label={`${d.score}`} />
+                    <div className="col" style={{ minWidth: 0, gap: '.1rem' }}>
+                      <span className="fw-6 clip">{domainMeta(d.id).emoji} {d.name}</span>
+                      <span className="muted t-xs">{d.score >= 70 ? 'thriving' : d.score >= 40 ? 'coming along' : 'wants a little attention'}</span>
+                    </div>
+                  </div>
+                ))}
+                {!lb.perDomain.length && <p className="muted" style={{ margin: 0 }}>Add a goal or two in your paths and this fills in fast.</p>}
+              </div>
             </div>
           </div>
         </Card>
-        <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: '1rem' }}>
-          {lb.perDomain.map(d => (
-            <Card key={d.id} pad={18}>
-              <div className="row between"><span className="fw-6">{domainMeta(d.id).emoji} {d.name}</span><span className="fw-7" style={{ color: scoreColor(d.score) }}>{d.score}</span></div>
-              <div style={{ height: 8, background: 'var(--line)', borderRadius: 99, marginTop: '.6rem', overflow: 'hidden' }}>
-                <div style={{ width: `${d.score}%`, height: '100%', background: scoreColor(d.score) }} />
-              </div>
-            </Card>
-          ))}
-          {!lb.perDomain.length && <Card pad={18}><p className="muted" style={{ margin: 0 }}>Add a goal or two in your paths and this fills in fast.</p></Card>}
-        </div>
       </div>
     );
   }
