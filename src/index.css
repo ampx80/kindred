@@ -404,3 +404,5 @@ html, body { overflow-x: clip; max-width: 100%; }
   .printable{box-shadow:none !important;border:none !important;padding:0 !important}
   .aria-orb{display:none !important}
 }
+
+.prose hr{border:none;border-top:1px solid var(--line);margin:1.4rem 0}

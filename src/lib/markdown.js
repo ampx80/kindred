@@ -18,6 +18,7 @@ export function mdToHtml(md = '') {
     if (/^###\s+/.test(line)) { close(); html += `<h4>${inline(line.replace(/^###\s+/, ''))}</h4>`; continue; }
     if (/^##\s+/.test(line)) { close(); html += `<h3>${inline(line.replace(/^##\s+/, ''))}</h3>`; continue; }
     if (/^#\s+/.test(line)) { close(); html += `<h2>${inline(line.replace(/^#\s+/, ''))}</h2>`; continue; }
+    if (/^(-{3,}|\*{3,}|_{3,})$/.test(line.trim())) { close(); html += '<hr>'; continue; }
     if ((m = line.match(/^\s*[-*]\s+(.*)/))) { if (list !== 'ul') { close(); html += '<ul>'; list = 'ul'; } html += `<li>${inline(m[1])}</li>`; continue; }
     if ((m = line.match(/^\s*\d+\.\s+(.*)/))) { if (list !== 'ol') { close(); html += '<ol>'; list = 'ol'; } html += `<li>${inline(m[1])}</li>`; continue; }
     if (line === '') { close(); continue; }
