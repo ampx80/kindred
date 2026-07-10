@@ -51,6 +51,7 @@ function blank() {
     wins: [],          // { id, at, title, detail, domainId }
     recs: [],          // { id, kind book|action|practice, title, why, domainId, done, at }
     messages: [],      // Aria thread, persisted so the relationship compounds
+    creations: [],     // saved outputs from the feature engine (plans, prayers, scripts...)
     settings: { theme: 'light', voiceOn: false },
   };
 }
@@ -337,6 +338,63 @@ export function saveMessages(messages) {
 export function saveSettings(patch) {
   commit({ ...state, settings: { ...state.settings, ...patch } });
   return { settings: state.settings };
+}
+
+/* ---------------- FEATURE ENGINE ---------------- */
+export const getCreations = () => state.creations || [];
+export const getCreation = (id) => (state.creations || []).find(c => c.id === id);
+// SUPABASE: insert into creations
+export function saveCreation({ featureId, title, markdown, inputs = {} }) {
+  if (!markdown) return { error: true, message: 'Nothing to save yet.' };
+  const creation = { id: uid(), featureId, title, markdown, inputs, at: nowIso() };
+  commit({ ...state, creations: [creation, ...(state.creations || [])].slice(0, 200) });
+  return { creation };
+}
+export function deleteCreation(id) {
+  commit({ ...state, creations: (state.creations || []).filter(c => c.id !== id) });
+  return { ok: true };
+}
+
+// A compact life-context string the feature engine sends to Aria so every
+// generated plan/prayer/script is personal. Never leaves out the safety framing.
+export function buildProfileText() {
+  const p = state.profile;
+  const lines = [];
+  if (p) {
+    lines.push(`Name: ${p.name}.`);
+    if (p.summary) lines.push(`Who they are: ${p.summary}`);
+    if (p.tone && TONES[p.tone]) lines.push(`They respond best to a ${TONES[p.tone].name} coaching tone (${TONES[p.tone].line}).`);
+    if (Array.isArray(p.domains) && p.domains.length) lines.push('What matters to them: ' + p.domains.map(d => d.name).join(', ') + '.');
+  }
+  const active = state.goals.filter(g => g.status === 'active');
+  if (active.length) lines.push('Current goals: ' + active.slice(0, 8).map(g => `${g.title}${g.streak ? ` (${g.streak} day streak)` : ''}`).join('; ') + '.');
+  if (state.people.length) lines.push('People they care about: ' + state.people.slice(0, 8).map(pe => `${pe.name}${pe.relation ? ` (${pe.relation})` : ''}`).join(', ') + '.');
+  const mt = moodTrend(5);
+  if (mt) lines.push(`Recent mood average: ${mt.avg} out of 5 over ${mt.count} check-ins.`);
+  return lines.join('\n');
+}
+
+// A real "Life Balance" score derived from actual engagement across their
+// domains: are goals active and moving, are check-ins happening, are people
+// being tended. Honest, not a vanity number.
+export function lifeBalance() {
+  const p = state.profile;
+  const domains = (p && p.domains) || [];
+  const perDomain = domains.map(d => {
+    const goals = state.goals.filter(g => g.domainId === d.id && g.status === 'active');
+    const streak = goals.reduce((a, g) => a + (g.streak || 0), 0);
+    const recent = goals.some(g => g.lastDoneAt && (Date.now() - new Date(g.lastDoneAt).getTime()) < 4 * 86400000);
+    // 0-100: having a goal (40) + recent action (35) + streak momentum (up to 25)
+    let score = 0;
+    if (goals.length) score += 40;
+    if (recent) score += 35;
+    score += Math.min(25, streak * 3);
+    return { id: d.id, name: d.name, score: Math.round(score) };
+  });
+  const moodMt = moodTrend(7);
+  const consistency = perDomain.length ? Math.round(perDomain.reduce((a, x) => a + x.score, 0) / perDomain.length) : 0;
+  const overall = Math.round(consistency * 0.7 + (moodMt ? (moodMt.avg / 5) * 100 : 50) * 0.3);
+  return { overall, perDomain, mood: moodMt };
 }
 
 /* ---------------- DEMO PERSONA ----------------

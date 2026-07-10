@@ -15,18 +15,21 @@ import PersonDetail from './pages/PersonDetail.jsx';
 import ForYou from './pages/ForYou.jsx';
 import Growth from './pages/Growth.jsx';
 import Settings from './pages/Settings.jsx';
+import Tools from './pages/Tools.jsx';
+import ToolPage from './pages/ToolPage.jsx';
 
-const APP_SEGS = new Set(['today', 'paths', 'journal', 'people', 'foryou', 'growth', 'settings']);
+const APP_SEGS = new Set(['today', 'paths', 'journal', 'people', 'foryou', 'growth', 'settings', 'tools']);
 
 const NAV = [
   { to: '/today', label: 'Today', icon: 'sun' },
   { to: '/paths', label: 'Paths', icon: 'compass' },
+  { to: '/tools', label: 'Tools', icon: 'sparkles' },
   { to: '/journal', label: 'Journal', icon: 'book' },
   { to: '/people', label: 'People', icon: 'users' },
-  { to: '/foryou', label: 'For you', icon: 'sparkles' },
+  { to: '/foryou', label: 'For you', icon: 'target' },
   { to: '/growth', label: 'Growth', icon: 'trophy' },
 ];
-const TABS = NAV.filter(n => n.to !== '/foryou'); // bottom bar keeps 5; For you lives on Today + rail
+const TABS = [NAV[0], NAV[1], NAV[2], NAV[4], NAV[6]]; // bottom bar: Today, Paths, Tools, People, Growth
 
 function Rail() {
   const profile = useStore(s => s.profile);
@@ -138,6 +141,9 @@ export default function App() {
               <Route path="/people/:id" element={<PersonDetail />} />
               <Route path="/foryou" element={<ForYou />} />
               <Route path="/growth" element={<Growth />} />
+              <Route path="/tools" element={<Tools />} />
+              <Route path="/tools/saved/:sub" element={<ToolPage />} />
+              <Route path="/tools/:id" element={<ToolPage />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="*" element={<Navigate to="/today" replace />} />
             </Routes>
