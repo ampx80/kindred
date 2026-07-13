@@ -2,7 +2,7 @@
 // render a live view computed from the user's real data. Also handles saved
 // creations at /tools/saved/:id.
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Card, Button, SectionHeader, Ring, useToast } from '../components/UI.jsx';
+import { Card, Button, Ring, useToast } from '../components/UI.jsx';
 import { Icon } from '../components/icons.jsx';
 import FeatureRunner from '../components/FeatureRunner.jsx';
 import BalanceOrbit from '../components/BalanceOrbit.jsx';
@@ -13,11 +13,58 @@ import {
   getPeople, peopleNeedingTouch, moodTrend, getGoals, getWins, getCheckins,
 } from '../lib/store.js';
 
+// Warm per-area tint, matched to the gallery so a tool looks the same on its
+// own page as on its card.
+const CAT_TINT = {
+  'Health and Fitness':      { c: 'var(--sage)', bg: 'var(--sage-bg)' },
+  'Relationships':           { c: 'var(--rose)', bg: 'var(--rose-bg)' },
+  'Mental and Spiritual':    { c: 'var(--sky)',  bg: 'var(--sky-bg)' },
+  'Productivity and Growth': { c: 'var(--gold)', bg: 'var(--gold-bg)' },
+  'Practical Daily Life':    { c: 'var(--accent-700)', bg: 'var(--accent-50)' },
+  'Advanced and Unique':     { c: 'var(--rose)', bg: 'var(--rose-bg)' },
+  'Output and Tools':        { c: 'var(--sage)', bg: 'var(--sage-bg)' },
+};
+const tint = (cat) => CAT_TINT[cat] || { c: 'var(--accent-700)', bg: 'var(--accent-50)' };
+
 function Back() {
   return <Link to="/tools" className="row gap-1 muted ui" style={{ fontSize: '.92rem', marginBottom: '1rem', textDecoration: 'none' }}><Icon name="compass" size={15} /> All tools</Link>;
 }
 
 function scoreColor(s) { return s >= 70 ? 'var(--sage)' : s >= 40 ? 'var(--gold)' : 'var(--rose)'; }
+
+// Warm, useful fallback for trackers that grow with use: instead of a dead end,
+// point people at the exact places that feed the view.
+function GrowingTracker({ feature }) {
+  const feeds = [
+    { icon: 'smile', label: 'Check in on Today', to: '/today', why: 'mood and daily rhythm' },
+    { icon: 'target', label: 'Set a goal in Paths', to: '/paths', why: 'momentum to measure' },
+    { icon: 'users', label: 'Add your people', to: '/people', why: 'relationships to track' },
+  ];
+  return (
+    <Card pad={24}>
+      <div className="row gap-2" style={{ alignItems: 'center', marginBottom: '.4rem' }}>
+        <span className="row center floaty" style={{ width: 48, height: 48, borderRadius: 14, background: tint(feature.category).bg, color: tint(feature.category).c, flex: 'none' }}>
+          <Icon name={feature.icon || 'sparkles'} size={24} />
+        </span>
+        <h2 style={{ margin: 0 }}>{feature.title}</h2>
+      </div>
+      <p className="muted" style={{ marginTop: 0 }}>{feature.blurb}</p>
+      <p>This one gets richer the more you use Kindred. Here is what feeds it:</p>
+      <div className="col gap-1" style={{ marginTop: '.4rem' }}>
+        {feeds.map(f => (
+          <Link key={f.to} to={f.to} className="k-dom-card" style={{ textDecoration: 'none' }}>
+            <span className="row center" style={{ width: 40, height: 40, borderRadius: 12, background: 'var(--accent-50)', color: 'var(--accent-700)', flex: 'none' }}><Icon name={f.icon} size={19} /></span>
+            <div className="col" style={{ minWidth: 0, gap: '.1rem' }}>
+              <span className="fw-6">{f.label}</span>
+              <span className="muted t-xs">Gives it {f.why}</span>
+            </div>
+            <span style={{ marginLeft: 'auto', color: 'var(--accent-600)' }}><Icon name="arrowRight" size={17} /></span>
+          </Link>
+        ))}
+      </div>
+    </Card>
+  );
+}
 
 function Tracker({ feature }) {
   useStore(s => s.goals); useStore(s => s.checkins); useStore(s => s.people); useStore(s => s.profile);
@@ -109,14 +156,8 @@ function Tracker({ feature }) {
     );
   }
 
-  // Honest fallback for trackers that grow with use.
-  return (
-    <Card pad={22}>
-      <h2 style={{ marginTop: 0 }}>{feature.title}</h2>
-      <p className="muted">{feature.blurb}</p>
-      <p>This tracker grows as you use Kindred. The more you check in, set goals, and talk with Aria, the more it has to show you. Start on your <Link className="link" to="/today">Today screen</Link> or ask Aria directly.</p>
-    </Card>
-  );
+  // Honest, useful fallback for trackers that grow with use.
+  return <GrowingTracker feature={feature} />;
 }
 
 export default function ToolPage() {
@@ -127,18 +168,41 @@ export default function ToolPage() {
   // Saved creation view (route /tools/saved/:sub).
   if (sub) {
     const c = getCreation(sub);
-    if (!c) return <div><Back /><Card pad={22}><p className="muted">That creation is gone.</p></Card></div>;
+    if (!c) {
+      return (
+        <div>
+          <Back />
+          <Card style={{ textAlign: 'center', padding: '2.6rem 1.5rem' }}>
+            <span className="row center floaty" style={{ width: 56, height: 56, borderRadius: 18, background: 'var(--accent-50)', color: 'var(--accent-600)', margin: '0 auto 1rem' }}>
+              <Icon name="book" size={26} />
+            </span>
+            <h3 style={{ marginBottom: '.45rem' }}>That creation is gone</h3>
+            <p className="muted" style={{ maxWidth: 380, margin: '0 auto 1.2rem' }}>It may have been deleted. You can always make a fresh one.</p>
+            <Link className="btn btn-primary" to="/tools">Back to tools</Link>
+          </Card>
+        </div>
+      );
+    }
+    const copy = async () => {
+      try { await navigator.clipboard.writeText(c.markdown || ''); toast('Copied to clipboard.', 'ok'); }
+      catch { toast('Could not copy here. Try Print instead.', 'warn'); }
+    };
     return (
       <div>
         <div className="row between wrap no-print" style={{ marginBottom: '1rem' }}>
           <Back />
-          <div className="row gap-2">
+          <div className="row gap-2 wrap">
+            <Button variant="ghost" onClick={copy}><Icon name="quote" size={16} /> Copy</Button>
             <Button variant="ghost" onClick={() => window.print()}><Icon name="book" size={16} /> Print</Button>
             <Button variant="ghost" onClick={() => { deleteCreation(c.id); toast('Deleted.', 'ok'); nav('/tools'); }} style={{ color: 'var(--rose)' }}><Icon name="x" size={16} /> Delete</Button>
           </div>
         </div>
         <Card pad={26} className="printable">
-          <h2 className="serif" style={{ marginTop: 0 }}>{c.title}</h2>
+          <div className="row gap-2" style={{ alignItems: 'center', marginBottom: '.5rem' }}>
+            <span className="aria-orb" style={{ width: 30, height: 30 }} aria-hidden />
+            <h2 className="serif" style={{ margin: 0 }}>{c.title}</h2>
+          </div>
+          <span className="muted t-xs no-print" style={{ display: 'block', marginBottom: '.6rem' }}>Saved {new Date(c.at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
           <div className="prose" dangerouslySetInnerHTML={{ __html: mdToHtml(c.markdown) }} />
         </Card>
       </div>
@@ -146,12 +210,36 @@ export default function ToolPage() {
   }
 
   const feature = getFeature(id);
-  if (!feature) return <div><Back /><Card pad={22}><p className="muted">That tool does not exist.</p></Card></div>;
+  if (!feature) {
+    return (
+      <div>
+        <Back />
+        <Card style={{ textAlign: 'center', padding: '2.6rem 1.5rem' }}>
+          <span className="row center floaty" style={{ width: 56, height: 56, borderRadius: 18, background: 'var(--accent-50)', color: 'var(--accent-600)', margin: '0 auto 1rem' }}>
+            <Icon name="compass" size={26} />
+          </span>
+          <h3 style={{ marginBottom: '.45rem' }}>That tool does not exist</h3>
+          <p className="muted" style={{ maxWidth: 380, margin: '0 auto 1.2rem' }}>It may have moved. Browse the full set instead.</p>
+          <Link className="btn btn-primary" to="/tools">See all 50 tools</Link>
+        </Card>
+      </div>
+    );
+  }
 
+  const t = tint(feature.category);
   return (
     <div>
       <Back />
-      <SectionHeader eyebrow={feature.category} title={feature.title} sub={feature.blurb} />
+      <div className="row gap-2" style={{ alignItems: 'flex-start' }}>
+        <span className="row center" style={{ width: 52, height: 52, borderRadius: 15, background: t.bg, color: t.c, flex: 'none', marginTop: '.15rem' }}>
+          <Icon name={feature.icon || 'sparkles'} size={26} />
+        </span>
+        <div className="col" style={{ gap: '.3rem', minWidth: 0 }}>
+          <span className="eyebrow">{feature.category}</span>
+          <h2 style={{ margin: 0 }}>{feature.title}</h2>
+          <span className="muted" style={{ fontSize: '1rem' }}>{feature.blurb}</span>
+        </div>
+      </div>
       <div style={{ marginTop: '1.2rem' }}>
         {feature.type === 'tracker' ? <Tracker feature={feature} /> : <FeatureRunner feature={feature} />}
       </div>

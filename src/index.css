@@ -566,3 +566,190 @@ h1, .wiz-q, .k-hero__title { letter-spacing: -.022em; }
 @media (prefers-reduced-motion: reduce) { .k-radar-shape, .k-radar-node { animation: none !important; opacity: 1 !important; transform: none !important; } .k-radar-core, .k-radar-spark { animation: none !important; } }
 .k-dom-card { display: flex; align-items: center; gap: .9rem; padding: .85rem 1rem; background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-md); transition: transform .18s var(--ease), border-color .18s var(--ease), box-shadow .18s var(--ease); }
 .k-dom-card:hover { transform: translateX(3px); border-color: var(--accent-300); box-shadow: var(--shadow-sm); }
+
+/* ============================================================
+   ============================================================
+   DELIGHT LAYER  (appended 2026-07-13)
+   A motion + interaction layer that wins by cascade order. Adds
+   tactile press, warm card lift/glow, streak + progress life,
+   confetti-ready pops, skeleton shimmer, springy focus, and the
+   StreakFlame / MoodRing / MilestoneBurst widget styles.
+   Nothing above this comment was edited. Everything here is
+   additive and fully reduced-motion aware at the bottom.
+   ============================================================
+   ============================================================ */
+:root {
+  --spring: cubic-bezier(.34, 1.56, .64, 1);   /* overshoot, for tactile pops */
+  --ease-soft: cubic-bezier(.22, 1, .36, 1);
+}
+
+/* ---- Tactile press: any element opts in with .kd-tap ---- */
+.kd-tap { transition: transform .16s var(--spring), box-shadow .18s var(--ease-soft), filter .18s var(--ease-soft); -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+.kd-tap:hover { transform: translateY(-1px); }
+.kd-tap:active { transform: scale(.955); }
+
+/* Give the shared .btn a springier, more physical press than the base rule */
+.btn.kd-tap:active, .btn:active { transform: scale(.96) translateY(1px); }
+.btn:focus-visible, .kd-tap:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--page), 0 0 0 6px color-mix(in srgb, var(--accent) 55%, transparent); }
+
+/* ---- Warm card lift + glow (opt-in, stronger than .card-hover) ---- */
+.kd-lift { transition: transform .26s var(--spring), box-shadow .26s var(--ease-soft), border-color .2s var(--ease-soft); will-change: transform; }
+.kd-lift:hover { transform: translateY(-5px); border-color: var(--accent-300);
+  box-shadow: var(--shadow-md), 0 22px 46px -24px rgba(217,107,67,.55), 0 0 0 1px color-mix(in srgb, var(--accent-300) 60%, transparent); }
+.kd-lift:active { transform: translateY(-2px) scale(.995); }
+
+/* A slow breathing glow ring you can drop on a hero element */
+.kd-glow { position: relative; }
+.kd-glow::before { content: ''; position: absolute; inset: -2px; border-radius: inherit; z-index: -1;
+  background: linear-gradient(120deg, var(--accent), var(--rose) 45%, var(--gold)); opacity: .28; filter: blur(12px);
+  animation: kdGlowPulse 4.8s ease-in-out infinite; pointer-events: none; }
+@keyframes kdGlowPulse { 0%,100% { opacity: .18; transform: scale(.99); } 50% { opacity: .42; transform: scale(1.02); } }
+
+/* ---- Delightful focus states for fields ---- */
+.input:focus, .select:focus, .textarea:focus { animation: kdFocusPop .34s var(--spring); }
+@keyframes kdFocusPop { 0% { box-shadow: 0 0 0 0 rgba(217,107,67,.28); } 60% { box-shadow: 0 0 0 5px rgba(217,107,67,.12); } 100% { box-shadow: 0 0 0 3px rgba(217,107,67,.16); } }
+
+/* ---- Springy entrances you can sprinkle on anything ---- */
+.kd-pop-in { animation: kdPopIn .5s var(--spring) both; }
+@keyframes kdPopIn { 0% { opacity: 0; transform: scale(.82) translateY(8px); } 100% { opacity: 1; transform: none; } }
+.kd-bounce-in { animation: kdBounceIn .62s var(--spring) both; }
+@keyframes kdBounceIn { 0% { opacity: 0; transform: translateY(18px) scale(.9); } 60% { opacity: 1; transform: translateY(-4px) scale(1.02); } 100% { transform: none; } }
+.kd-wiggle:hover { animation: kdWiggle .5s ease-in-out; }
+@keyframes kdWiggle { 0%,100% { transform: rotate(0); } 25% { transform: rotate(-4deg); } 75% { transform: rotate(4deg); } }
+.kd-heartbeat { animation: kdHeartbeat 1.9s ease-in-out infinite; transform-origin: center; }
+@keyframes kdHeartbeat { 0%,100% { transform: scale(1); } 12% { transform: scale(1.16); } 24% { transform: scale(1); } 36% { transform: scale(1.1); } 48% { transform: scale(1); } }
+
+/* ---- A number that counts alive when it changes (add/remove .kd-count-pop) ---- */
+.kd-count-pop { animation: kdCountPop .55s var(--spring); }
+@keyframes kdCountPop { 0% { transform: scale(.7); color: var(--accent); } 55% { transform: scale(1.18); } 100% { transform: none; } }
+
+/* ---- Progress: a warm fill with a travelling sheen ---- */
+.kd-progress { height: 12px; border-radius: 999px; background: var(--n-50); overflow: hidden; position: relative; box-shadow: inset 0 1px 2px rgba(70,50,35,.08); }
+.kd-progress__fill { height: 100%; border-radius: 999px; position: relative; overflow: hidden;
+  background: linear-gradient(90deg, #e0794e, #d95d78 55%, #dd9a2e); transition: width .8s var(--spring); }
+.kd-progress__fill::after { content: ''; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,.5) 50%, transparent 70%); transform: translateX(-100%); animation: kdSheen 2.4s var(--ease-soft) infinite; }
+@keyframes kdSheen { to { transform: translateX(220%); } }
+
+/* Reuse the existing .warmbar look but add the sheen (additive, does not edit it) */
+.warmbar i::after { content: ''; position: absolute; }
+.warmbar { position: relative; }
+
+/* ---- Skeleton shimmer for loading states ---- */
+.kd-skel { position: relative; overflow: hidden; border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--n-100) 70%, transparent); }
+.kd-skel::after { content: ''; position: absolute; inset: 0;
+  background: linear-gradient(100deg, transparent 20%, color-mix(in srgb, var(--paper) 85%, transparent) 50%, transparent 80%);
+  transform: translateX(-100%); animation: kdShimmer 1.5s ease-in-out infinite; }
+@keyframes kdShimmer { to { transform: translateX(100%); } }
+.kd-skel-line { height: 1em; margin-bottom: .55rem; }
+.kd-skel-line.w-60 { width: 60%; } .kd-skel-line.w-80 { width: 80%; } .kd-skel-line.w-40 { width: 40%; }
+
+/* ---- Confetti-ready: a quick celebratory scale-pop (pair with celebrate()) ---- */
+.kd-celebrate { animation: kdCelebrate .7s var(--spring); }
+@keyframes kdCelebrate { 0% { transform: scale(1); } 30% { transform: scale(1.14) rotate(-2deg); } 55% { transform: scale(.98) rotate(1deg); } 100% { transform: none; } }
+
+/* ---- Ambient warmth enhancement: a 4th slow-twinkling light + soft grain
+        of drifting sparks. Additive to the existing .ambient bubbles. ---- */
+.ambient .b4 { position: absolute; width: 300px; height: 300px; top: 12%; right: 32%;
+  border-radius: 50%; filter: blur(80px);
+  background: radial-gradient(circle, rgba(242,201,76,.10), transparent 70%);
+  animation: floatA 40s ease-in-out infinite reverse; }
+[data-theme="dark"] .ambient .b4 { background: radial-gradient(circle, rgba(242,201,76,.14), transparent 70%); }
+.ambient::after { content: ''; position: absolute; inset: 0;
+  background-image: radial-gradient(1.4px 1.4px at 20% 30%, rgba(224,121,78,.35), transparent),
+    radial-gradient(1.4px 1.4px at 70% 60%, rgba(217,93,120,.3), transparent),
+    radial-gradient(1.2px 1.2px at 45% 80%, rgba(221,154,46,.3), transparent),
+    radial-gradient(1.2px 1.2px at 85% 20%, rgba(111,154,99,.28), transparent);
+  animation: kdDrift 26s ease-in-out infinite; opacity: .6; }
+@keyframes kdDrift { 0%,100% { transform: translateY(0); opacity: .5; } 50% { transform: translateY(-14px); opacity: .8; } }
+
+/* ============================================================
+   STREAKFLAME widget (components/Delight.jsx -> StreakFlame)
+   ============================================================ */
+.kd-flame { position: relative; display: inline-flex; align-items: center; justify-content: center; line-height: 0; flex: none; filter: drop-shadow(0 3px 8px rgba(217,107,67,calc(.14 + var(--flame-heat,0) * .3))); }
+.kd-flame svg { display: block; overflow: visible; }
+.kd-flame__outer { transform-box: fill-box; transform-origin: 50% 90%; animation: kdFlameFlicker 1.7s ease-in-out infinite; }
+.kd-flame__inner { transform-box: fill-box; transform-origin: 50% 90%; animation: kdFlameFlicker 1.15s ease-in-out infinite alternate; opacity: calc(.75 + var(--flame-heat,0) * .25); }
+@keyframes kdFlameFlicker { 0%,100% { transform: scaleY(1) scaleX(1) rotate(0); } 30% { transform: scaleY(1.08) scaleX(.96) rotate(-1.5deg); } 60% { transform: scaleY(.96) scaleX(1.03) rotate(1.5deg); } }
+.kd-flame--ember .kd-flame__outer, .kd-flame--ember .kd-flame__inner { animation: none; opacity: .55; }
+.kd-flame--blaze { animation: kdBlaze 2.4s ease-in-out infinite; }
+@keyframes kdBlaze { 0%,100% { filter: drop-shadow(0 3px 10px rgba(242,201,76,.5)); } 50% { filter: drop-shadow(0 4px 16px rgba(224,121,78,.75)); } }
+.kd-flame__n { position: absolute; bottom: -2px; right: -2px; min-width: 16px; height: 16px; padding: 0 4px;
+  display: grid; place-items: center; font-size: 10px; font-weight: 800; color: #fff; border-radius: 999px;
+  background: var(--accent-600); box-shadow: 0 1px 3px rgba(70,50,35,.35); line-height: 1; }
+
+/* ============================================================
+   MOODRING widget (components/Delight.jsx -> MoodRing)
+   ============================================================ */
+.kd-moodring { display: flex; flex-direction: column; gap: .6rem; }
+.kd-moodring__row { display: flex; gap: .5rem; flex-wrap: wrap; }
+.kd-mood { display: grid; place-items: center; border-radius: 50%; cursor: pointer; padding: 0;
+  background: var(--n-25); border: 2px solid var(--line); line-height: 1; filter: grayscale(.35) opacity(.72);
+  transition: transform .18s var(--spring), border-color .18s var(--ease-soft), background .18s, filter .2s, box-shadow .2s; -webkit-tap-highlight-color: transparent; }
+.kd-mood:hover { transform: translateY(-3px) scale(1.06); filter: none; border-color: var(--mood-c); }
+.kd-mood.is-on { filter: none; border-color: var(--mood-c); background: color-mix(in srgb, var(--mood-c) 16%, var(--paper));
+  box-shadow: 0 6px 18px -6px color-mix(in srgb, var(--mood-c) 70%, transparent), 0 0 0 3px color-mix(in srgb, var(--mood-c) 22%, transparent); transform: scale(1.08); }
+.kd-mood.is-on:hover { transform: translateY(-3px) scale(1.12); }
+.kd-mood.is-bump { animation: kdMoodBump .5s var(--spring); }
+@keyframes kdMoodBump { 0% { transform: scale(1); } 40% { transform: scale(1.3) rotate(-6deg); } 70% { transform: scale(1.05) rotate(3deg); } 100% { transform: scale(1.08); } }
+.kd-moodring__label { font-size: .96rem; font-weight: 600; }
+
+/* ============================================================
+   MILESTONEBURST widget (components/Delight.jsx -> MilestoneBurst)
+   ============================================================ */
+.kd-burst { position: fixed; inset: 0; z-index: 140; display: grid; place-items: center; pointer-events: auto;
+  background: radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 60%);
+  animation: kdBurstBg .5s var(--ease-soft) both; }
+@keyframes kdBurstBg { from { opacity: 0; } to { opacity: 1; } }
+.kd-burst__card { position: relative; text-align: center; padding: 2.4rem 3rem; border-radius: var(--r-xl);
+  background: color-mix(in srgb, var(--paper) 92%, transparent); border: 1px solid var(--accent-300);
+  box-shadow: var(--shadow-lg), 0 0 0 1px color-mix(in srgb, var(--accent-300) 50%, transparent);
+  backdrop-filter: blur(10px) saturate(1.15); animation: kdBurstCard .7s var(--spring) both; }
+@keyframes kdBurstCard { 0% { opacity: 0; transform: scale(.6) translateY(20px); } 60% { opacity: 1; transform: scale(1.05); } 100% { transform: none; } }
+.kd-burst__big { font-size: clamp(3.4rem, 11vw, 5.4rem); line-height: 1; font-weight: 700;
+  background: linear-gradient(115deg, #d95d78, #e0794e 55%, #dd9a2e); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+.kd-burst__label { margin-top: .3rem; font-size: 1.15rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--accent-700); }
+.kd-burst__sub { margin-top: .5rem; font-size: 1rem; }
+.kd-burst__rays { position: absolute; inset: 0; display: grid; place-items: center; z-index: -1; pointer-events: none; }
+.kd-burst__rays i { position: absolute; width: 4px; height: 40px; border-radius: 4px; top: 50%; left: 50%;
+  background: linear-gradient(var(--gold), transparent); transform-origin: 50% 0;
+  transform: rotate(calc(var(--i) * 30deg)) translateY(-46px); animation: kdRayPop .8s var(--spring) both; animation-delay: calc(var(--i) * .03s); }
+@keyframes kdRayPop { 0% { opacity: 0; transform: rotate(calc(var(--i) * 30deg)) translateY(-10px) scaleY(.2); } 100% { opacity: .85; transform: rotate(calc(var(--i) * 30deg)) translateY(-46px) scaleY(1); } }
+
+/* ============================================================
+   REDUCED MOTION - the delight layer goes calm and static. Every
+   widget keeps its resting look; only the motion is removed.
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  .kd-tap, .kd-lift, .kd-mood { transition: none !important; }
+  .kd-tap:hover, .kd-lift:hover, .kd-mood:hover { transform: none !important; }
+  .kd-tap:active, .kd-lift:active, .btn:active, .btn.kd-tap:active { transform: none !important; }
+  .kd-glow::before, .input:focus, .select:focus, .textarea:focus,
+  .kd-pop-in, .kd-bounce-in, .kd-wiggle:hover, .kd-heartbeat, .kd-count-pop,
+  .kd-progress__fill::after, .kd-skel::after, .kd-celebrate,
+  .ambient .b4, .ambient::after,
+  .kd-flame, .kd-flame__outer, .kd-flame__inner, .kd-flame--blaze,
+  .kd-mood.is-bump, .kd-burst, .kd-burst__card, .kd-burst__rays i {
+    animation: none !important;
+  }
+  .kd-progress__fill { transition: none !important; }
+  .kd-burst__card { opacity: 1; transform: none; }
+}
+
+/* ---- Mobile More sheet (P0: rail items were unreachable on phones) ---- */
+.kd-tab-more { background: none; border: none; cursor: pointer; font: inherit; color: inherit; }
+.kd-sheet-scrim { position: fixed; inset: 0; z-index: 60; background: rgba(30,20,14,.38);
+  backdrop-filter: blur(3px); display: flex; align-items: flex-end; animation: kdFade .18s ease; }
+@keyframes kdFade { from { opacity: 0 } to { opacity: 1 } }
+.kd-sheet { width: 100%; background: var(--paper, #fffdf9); border-top-left-radius: 22px; border-top-right-radius: 22px;
+  border: 1px solid var(--line); border-bottom: none; box-shadow: 0 -14px 40px rgba(30,20,14,.22);
+  padding: .6rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px)); animation: kdSheetUp .26s cubic-bezier(.22,1,.36,1); max-height: 80vh; overflow: auto; }
+@keyframes kdSheetUp { from { transform: translateY(100%) } to { transform: translateY(0) } }
+.kd-sheet-grip { width: 40px; height: 4px; border-radius: 999px; background: var(--line-2, #e0d2c2); margin: .3rem auto .9rem; }
+.kd-sheet-item { display: flex; align-items: center; gap: .85rem; width: 100%; padding: .85rem .8rem;
+  background: transparent; border: 1px solid transparent; border-radius: 14px; cursor: pointer; font: inherit; color: var(--ink); text-align: left; transition: background .14s, border-color .14s; }
+.kd-sheet-item:hover, .kd-sheet-item:active { background: var(--accent-50); border-color: var(--line); }
+.kd-sheet-ic { width: 40px; height: 40px; border-radius: 12px; background: var(--accent-50); color: var(--accent-700);
+  display: grid; place-items: center; flex: none; }
+@media (prefers-reduced-motion: reduce) { .kd-sheet-scrim, .kd-sheet { animation: none; } }
+@media (min-width: 861px) { .kd-tab-more { display: none; } }

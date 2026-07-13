@@ -10,10 +10,10 @@ import { Icon } from './icons.jsx';
 import CrisisCard from './CrisisCard.jsx';
 import { screenForCrisis, crisisReply, CRISIS_RESOURCES } from '../lib/safety.js';
 import { celebrate } from '../lib/celebrate.js';
-import { speak, speechAvailable } from '../lib/voice.js';
+import { speak, speechAvailable, stopSpeaking } from '../lib/voice.js';
 import {
   getProfile, getGoals, getCheckins, getJournal, getPeople, getWins, getRecs,
-  getMessages, saveMessages, getTodayCheckin, getSettings,
+  getMessages, saveMessages, getTodayCheckin, getSettings, saveSettings,
   addGoal, addWin, addPerson, addJournal, addRec, addCheckin,
 } from '../lib/store.js';
 
@@ -84,23 +84,37 @@ export default function AriaDock() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [listening, setListening] = useState(false);
+  const [voiceOn, setVoiceOn] = useState(() => !!getSettings()?.voiceOn);
+  const [sending, setSending] = useState(false);   // brief tactile pulse on the send button
   const loc = useLocation();
   const navigate = useNavigate();
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
   const recogRef = useRef(null);
+  const sendRef = useRef(null);                  // always points at the latest send(), so external opens never fire a stale closure
   const lastDiscloseRef = useRef(Date.now());   // NY GBL Art 47: re-disclose non-human status every 3h of continuous engagement
 
   useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, [msgs, busy, open]);
   useEffect(() => { if (open && inputRef.current && window.innerWidth > 860) inputRef.current.focus(); }, [open]);
   useEffect(() => { saveMessages(msgs); }, [msgs]);
+  // Whenever the dock closes, hush any spoken reply in progress.
+  useEffect(() => { if (!open) stopSpeaking(); }, [open]);
 
   // Open from anywhere (e.g. a Today banner): window.dispatchEvent(new CustomEvent('kindred:aria', { detail: { prompt } }))
   useEffect(() => {
-    const onOpen = (e) => { setOpen(true); const p = e.detail?.prompt; if (p) setTimeout(() => send(p), 120); };
+    const onOpen = (e) => { setOpen(true); const p = e.detail?.prompt; if (p) setTimeout(() => sendRef.current?.(p), 160); };
     window.addEventListener('kindred:aria', onOpen);
     return () => window.removeEventListener('kindred:aria', onOpen);
-  }, []); // eslint-disable-line
+  }, []); // sendRef stays fresh below, so the handler never runs a stale send
+
+  const toggleVoice = () => {
+    setVoiceOn(v => {
+      const next = !v;
+      saveSettings({ voiceOn: next });
+      if (!next) stopSpeaking();
+      return next;
+    });
+  };
 
   const speechOK = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
   const toggleMic = () => {
@@ -125,6 +139,7 @@ export default function AriaDock() {
   const send = useCallback(async (text) => {
     const q = (text ?? input).trim();
     if (!q || busy) return;
+    setSending(true); setTimeout(() => setSending(false), 320);   // tactile launch pulse
 
     // Periodic non-human disclosure for long continuous sessions (NY law).
     const preface = [];
@@ -173,6 +188,7 @@ export default function AriaDock() {
       }]);
     } finally { setBusy(false); }
   }, [input, busy, msgs, loc.pathname]);
+  useEffect(() => { sendRef.current = send; }, [send]);   // keep the external-open handler pointed at the live send
 
   const runAction = (a) => {
     try {
@@ -219,8 +235,13 @@ export default function AriaDock() {
 
   return (
     <>
-      <button className={`aria-fab${open ? ' is-open' : ''}`} onClick={() => setOpen(o => !o)} aria-label="Talk to Aria">
-        {open ? <Icon name="x" size={22} /> : <span className="aria-orb" style={{ width: 34, height: 34, boxShadow: 'none', animation: 'none' }} aria-hidden />}
+      <button className={`aria-fab${open ? ' is-open' : ''}`} onClick={() => setOpen(o => !o)} aria-label={open ? 'Close Aria' : 'Talk to Aria'}>
+        {open ? <Icon name="x" size={22} /> : (
+          <>
+            <span className="aria-fab__pulse" aria-hidden />
+            <span className="aria-orb aria-fab__orb" style={{ width: 34, height: 34 }} aria-hidden />
+          </>
+        )}
       </button>
 
       {open && (
@@ -231,6 +252,11 @@ export default function AriaDock() {
               <div className="aria-head__name">Aria <span className="aria-head__tag">AI companion</span></div>
               <div className="aria-head__sub">An AI, not a person. Here for support.</div>
             </div>
+            {speechAvailable() && (
+              <button className={`aria-x aria-voice${voiceOn ? ' is-on' : ''}`} onClick={toggleVoice} aria-pressed={voiceOn} aria-label={voiceOn ? 'Turn off spoken replies' : 'Turn on spoken replies'} title={voiceOn ? 'Aria reads replies aloud' : 'Aria replies in text'}>
+                <Icon name={voiceOn ? 'volume' : 'volumeOff'} size={18} />
+              </button>
+            )}
             <button className="aria-x" onClick={() => setHelpOpen(o => !o)} aria-label="Get real help" title="Get real help now"><Icon name="heart" size={18} /></button>
             <button className={`aria-x${menuOpen ? ' is-active' : ''}`} onClick={() => setMenuOpen(o => !o)} aria-label="What Aria can do" title="What can Aria do?"><Icon name="sparkles" size={18} /></button>
             <button className="aria-x" onClick={() => setOpen(false)} aria-label="Close"><Icon name="x" size={18} /></button>
@@ -329,7 +355,7 @@ export default function AriaDock() {
                 <Icon name="mic" size={16} />
               </button>
             )}
-            <button type="submit" disabled={busy || !input.trim()} aria-label="Send"><Icon name="send" size={16} /></button>
+            <button type="submit" className={`aria-send${input.trim() && !busy ? ' is-ready' : ''}${sending ? ' is-launch' : ''}`} disabled={busy || !input.trim()} aria-label="Send"><Icon name="send" size={16} /></button>
           </form>
         </div>
       )}
@@ -345,8 +371,15 @@ function AriaStyles() {
     .aria-fab { position: fixed; right: 20px; bottom: 20px; z-index: 60; width: 60px; height: 60px; border-radius: 50%; border: none; cursor: pointer;
       background: radial-gradient(circle at 32% 26%, #f0a97a, #dd6f45 65%, #c2543a); color: #fff; display: grid; place-items: center;
       box-shadow: 0 12px 32px -8px rgba(194,84,58,.6), 0 0 0 1px rgba(255,255,255,.1) inset; transition: transform .2s cubic-bezier(.22,1,.36,1), box-shadow .2s; animation: ariaFloat 5s ease-in-out infinite; }
+    .aria-fab > * { grid-area: 1 / 1; }
     .aria-fab:hover { transform: translateY(-3px) scale(1.04); box-shadow: 0 18px 42px -8px rgba(217,107,67,.6), 0 0 0 1px rgba(255,255,255,.14) inset; }
+    .aria-fab:active { transform: translateY(-1px) scale(.95); }
     .aria-fab.is-open { animation: none; background: #a44a2b; }
+    /* the little living presence inside the button + a soft "I'm here" heartbeat */
+    .aria-fab__orb { box-shadow: 0 4px 14px -4px rgba(160,60,40,.6) !important; }
+    .aria-fab__orb::after { display: none; }
+    .aria-fab__pulse { width: 34px; height: 34px; border-radius: 50%; place-self: center; box-shadow: 0 0 0 0 rgba(255,255,255,.5); animation: ariaFabPulse 3.4s ease-out infinite; pointer-events: none; }
+    @keyframes ariaFabPulse { 0% { box-shadow: 0 0 0 0 rgba(255,236,224,.55); } 70%,100% { box-shadow: 0 0 0 16px rgba(255,236,224,0); } }
     @keyframes ariaFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
     @media (max-width: 860px) { .aria-fab { bottom: calc(76px + env(safe-area-inset-bottom)); right: 14px; width: 54px; height: 54px; } }
 
@@ -364,6 +397,10 @@ function AriaStyles() {
     .aria-head__sub { font-size: 12px; color: #ffe4d6; margin-top: 1px; }
     .aria-x { border: none; background: transparent; color: #ffe9dd; cursor: pointer; padding: 4px; border-radius: 7px; display: grid; place-items: center; position: relative; z-index: 1; }
     .aria-x:hover, .aria-x.is-active { background: rgba(255,255,255,.2); color: #fff; }
+    .aria-x:active { transform: scale(.9); }
+    .aria-voice.is-on { background: rgba(255,255,255,.28); color: #fff; }
+    .aria-voice.is-on::after { content: ''; position: absolute; right: 3px; top: 3px; width: 5px; height: 5px; border-radius: 50%; background: #ffe4d6; box-shadow: 0 0 0 0 rgba(255,228,214,.8); animation: ariaVoiceDot 1.8s ease-out infinite; }
+    @keyframes ariaVoiceDot { 0% { box-shadow: 0 0 0 0 rgba(255,228,214,.7); } 70%,100% { box-shadow: 0 0 0 6px rgba(255,228,214,0); } }
 
     .aria-menu { position: absolute; top: 62px; left: 0; right: 0; bottom: 0; z-index: 5; background: var(--paper); display: flex; flex-direction: column; animation: ariaMenuIn .2s cubic-bezier(.22,1,.36,1); }
     @keyframes ariaMenuIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
@@ -377,27 +414,44 @@ function AriaStyles() {
     .aria-cap__item:hover { border-color: var(--accent-300); background: var(--accent-50); transform: translateX(2px); }
     .aria-cap__go { color: var(--n-400); flex-shrink: 0; }
 
-    .aria-scroll { flex: 1; overflow-y: auto; padding: 16px; background: var(--page); display: flex; flex-direction: column; gap: 14px; }
-    .aria-msg { display: flex; gap: 8px; align-items: flex-start; }
+    .aria-scroll { flex: 1; overflow-y: auto; padding: 16px; background: var(--page); display: flex; flex-direction: column; gap: 14px; scroll-behavior: smooth; }
+    .aria-msg { display: flex; gap: 8px; align-items: flex-start; animation: ariaMsgIn .34s cubic-bezier(.22,1,.36,1) both; }
     .aria-msg--user { justify-content: flex-end; }
-    .aria-bubble { max-width: 85%; font-size: 14.5px; line-height: 1.5; color: var(--ink); background: var(--paper); border: 1px solid var(--line); padding: 10px 13px; border-radius: 15px; min-width: 0; }
-    .aria-msg--user .aria-bubble { background: var(--accent); color: #fff; border-color: var(--accent); border-bottom-right-radius: 5px; }
+    .aria-msg--user.aria-msg { animation-name: ariaMsgInR; }
+    @keyframes ariaMsgIn { from { opacity: 0; transform: translateY(9px) scale(.985); } to { opacity: 1; transform: none; } }
+    @keyframes ariaMsgInR { from { opacity: 0; transform: translateY(9px) translateX(6px) scale(.985); } to { opacity: 1; transform: none; } }
+    .aria-bubble { max-width: 85%; font-size: 14.5px; line-height: 1.5; color: var(--ink); background: var(--paper); border: 1px solid var(--line); padding: 10px 13px; border-radius: 15px; min-width: 0; box-shadow: 0 1px 2px rgba(70,50,35,.05); }
+    .aria-msg--user .aria-bubble { background: linear-gradient(135deg, var(--accent), var(--accent-600)); color: #fff; border-color: var(--accent); border-bottom-right-radius: 5px; box-shadow: 0 6px 16px -8px rgba(217,107,67,.6); }
     .aria-msg--assistant .aria-bubble { border-bottom-left-radius: 5px; }
+    .aria-msg--assistant .aria-orb { transition: transform .2s var(--ease); }
 
     .aria-draft { margin-top: 9px; border: 1px solid var(--line); border-radius: 10px; padding: 10px; background: var(--n-25); }
     .aria-draft__to { font-size: 12.5px; font-weight: 700; color: var(--n-700); margin-bottom: 4px; }
     .aria-draft__body { font-size: 13.5px; white-space: pre-wrap; color: var(--ink-2); margin: 4px 0 8px; }
 
     .aria-navbtn { display: inline-flex; align-items: center; gap: 6px; margin-top: 9px; padding: 7px 12px; font-size: 13.5px; font-weight: 700; font-family: inherit;
-      background: var(--accent-50); color: var(--accent-700); border: 1px solid var(--accent-300); border-radius: 999px; cursor: pointer; }
-    .aria-navbtn:hover { background: var(--accent-300); color: #fff; }
+      background: var(--accent-50); color: var(--accent-700); border: 1px solid var(--accent-300); border-radius: 999px; cursor: pointer; transition: background .15s, color .15s, transform .12s, box-shadow .15s; }
+    .aria-navbtn:hover { background: var(--accent-300); color: #fff; transform: translateY(-1px); box-shadow: 0 6px 14px -8px rgba(217,107,67,.7); }
+    .aria-navbtn:active { transform: translateY(0) scale(.97); }
+    .aria-navbtn svg { transition: transform .18s var(--ease); }
+    .aria-navbtn:hover svg { transform: translateX(3px); }
     .aria-actions { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
-    .aria-action { display: inline-flex; align-items: center; gap: 7px; padding: 9px 12px; font-size: 13.5px; font-weight: 700; font-family: inherit;
-      background: var(--ink); color: var(--paper); border: none; border-radius: 999px; cursor: pointer; text-align: left; transition: filter .15s, transform .15s; }
-    .aria-action:hover { filter: brightness(1.18); transform: translateY(-1px); }
+    /* proposed-action buttons: land with a gentle stagger so a set of moves feels offered, not dumped */
+    .aria-action { display: inline-flex; align-items: center; gap: 8px; padding: 10px 13px; font-size: 13.5px; font-weight: 700; font-family: inherit;
+      background: linear-gradient(135deg, #3a302a, var(--ink)); color: var(--paper); border: none; border-radius: 999px; cursor: pointer; text-align: left; position: relative; overflow: hidden;
+      transition: filter .15s, transform .15s, box-shadow .15s; animation: ariaActIn .3s cubic-bezier(.22,1,.36,1) both; box-shadow: 0 4px 12px -6px rgba(46,36,30,.5); }
+    .aria-action:nth-child(2) { animation-delay: .05s; } .aria-action:nth-child(3) { animation-delay: .1s; } .aria-action:nth-child(4) { animation-delay: .15s; } .aria-action:nth-child(n+5) { animation-delay: .2s; }
+    .aria-action svg { flex: none; color: var(--gold); }
+    .aria-action:hover { filter: brightness(1.16); transform: translateY(-1px); box-shadow: 0 8px 20px -8px rgba(46,36,30,.6); }
+    .aria-action:active { transform: translateY(0) scale(.98); }
+    .aria-action::after { content: ''; position: absolute; inset: 0; background: radial-gradient(circle, rgba(255,255,255,.4), transparent 60%); opacity: 0; transform: scale(0); pointer-events: none; }
+    .aria-action:active::after { animation: ariaRipple .5s ease-out; }
+    @keyframes ariaActIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+    @keyframes ariaRipple { 0% { opacity: .5; transform: scale(0); } 100% { opacity: 0; transform: scale(2.2); } }
     .aria-suggest { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-    .aria-chip { font-size: 12.5px; font-weight: 600; font-family: inherit; padding: 6px 11px; border-radius: 999px; border: 1px solid var(--line-strong); background: var(--paper); color: var(--n-600); cursor: pointer; text-align: left; }
-    .aria-chip:hover { border-color: var(--accent); color: var(--accent-600); }
+    .aria-chip { font-size: 12.5px; font-weight: 600; font-family: inherit; padding: 6px 11px; border-radius: 999px; border: 1px solid var(--line-strong); background: var(--paper); color: var(--n-600); cursor: pointer; text-align: left; transition: border-color .14s, color .14s, background .14s, transform .12s, box-shadow .15s; }
+    .aria-chip:hover { border-color: var(--accent); color: var(--accent-600); background: var(--accent-50); transform: translateY(-1px); box-shadow: 0 5px 12px -8px rgba(217,107,67,.6); }
+    .aria-chip:active { transform: translateY(0) scale(.96); }
 
     .aria-thinking { display: inline-flex; gap: 4px; align-items: center; }
     .aria-thinking span { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: ariaBlink 1.2s infinite; }
@@ -411,10 +465,21 @@ function AriaStyles() {
     .aria-mic:hover { border-color: var(--accent); color: var(--accent); }
     .aria-mic.is-live { background: var(--risk); border-color: var(--risk); color: #fff; animation: ariaMicPulse 1.3s ease-in-out infinite; }
     @keyframes ariaMicPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(182,71,47,.5); } 50% { box-shadow: 0 0 0 6px rgba(182,71,47,0); } }
-    .aria-input button[type=submit] { width: 42px; border: none; border-radius: 999px; background: var(--accent); color: #fff; cursor: pointer; display: grid; place-items: center; flex-shrink: 0; }
-    .aria-input button:disabled { opacity: .45; cursor: default; }
+    .aria-input button[type=submit] { width: 42px; border: none; border-radius: 999px; background: var(--accent); color: #fff; cursor: pointer; display: grid; place-items: center; flex-shrink: 0; overflow: hidden; transition: background .18s, transform .12s, box-shadow .18s; }
+    .aria-send svg { transition: transform .18s var(--ease); }
+    .aria-send.is-ready { background: linear-gradient(135deg, var(--accent), var(--accent-600)); box-shadow: 0 6px 16px -6px rgba(217,107,67,.7); }
+    .aria-send.is-ready:hover { transform: translateY(-1px); }
+    .aria-send.is-ready:hover svg { transform: translate(2px,-2px) rotate(6deg); }
+    .aria-send.is-ready:active { transform: scale(.9); }
+    .aria-send.is-launch svg { animation: ariaLaunch .34s cubic-bezier(.22,1,.36,1); }
+    @keyframes ariaLaunch { 40% { transform: translate(10px,-10px) rotate(14deg); opacity: .2; } 41% { transform: translate(-8px,8px) rotate(0); opacity: 0; } 100% { transform: none; opacity: 1; } }
+    .aria-input button:disabled { opacity: .45; cursor: default; box-shadow: none; }
 
-    @media (prefers-reduced-motion: reduce) { .aria-fab, .aria-panel, .aria-thinking span { animation: none !important; } }
+    @media (prefers-reduced-motion: reduce) {
+      .aria-fab, .aria-panel, .aria-thinking span, .aria-fab__pulse, .aria-fab__orb, .aria-msg, .aria-action, .aria-voice.is-on::after, .aria-send.is-launch svg { animation: none !important; }
+      .aria-msg, .aria-action { opacity: 1 !important; transform: none !important; }
+      .aria-scroll { scroll-behavior: auto; }
+    }
     `}</style>
   );
 }

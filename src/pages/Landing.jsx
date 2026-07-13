@@ -1,11 +1,14 @@
 // The front door. A warm, living welcome: a drifting aurora, a breathing Aria
-// orb, an oversized serif headline that arrives word by word, a hand-drawn
-// "how it works" flow, and a constellation of the life Kindred holds together.
-// Meeting Aria IS the pitch - everything here is warmth, not a feature grid.
+// orb, an oversized serif headline that arrives word by word, a self-playing
+// Aria interview (the magic, shown not told), honest trust moments, a glimpse
+// of a life in motion, a hand-drawn "how it works" flow, and a constellation of
+// the life Kindred holds together. Meeting Aria IS the pitch - everything here
+// is warmth, not a feature grid.
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icon } from '../components/icons.jsx';
 import { loadDemo } from '../lib/store.js';
+import { celebrate } from '../lib/celebrate.js';
 
 const REDUCED = () => typeof window !== 'undefined' && window.matchMedia
   && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -65,10 +68,233 @@ function Headline({ children }) {
     <span className="k-reveal-words">
       {words.map((w, i) => (
         <span key={i} className="w" style={{ animationDelay: `${0.15 + i * 0.075}s` }}>
-          {w}{i < words.length - 1 ? ' ' : ''}
+          {w}{i < words.length - 1 ? ' ' : ''}
         </span>
       ))}
     </span>
+  );
+}
+
+/* ============================================================
+   ARIA DEMO - a self-playing slice of the real adaptive interview.
+   She asks, you answer, she follows the thread and maps your life
+   in front of you. Scripted from the real interview engine + the
+   seeded demo life, so it is honest, not a mock. Tap any answer to
+   drive it yourself; it auto-plays if you just watch.
+   ============================================================ */
+const DEMO_DOMAINS = [
+  { key: 'body', emoji: '💪', label: 'Body' },
+  { key: 'family', emoji: '🏡', label: 'Family' },
+  { key: 'purpose', emoji: '⭐', label: 'Purpose' },
+  { key: 'creativity', emoji: '✍️', label: 'The book' },
+];
+const DEMO_STEPS = [
+  {
+    aria: 'If the next year of your life went exactly how you hope, what would be different?',
+    choices: [
+      { label: 'My body, and honestly my brother', sensed: ['body', 'family'] },
+      { label: 'The work I keep not doing', sensed: ['purpose'] },
+      { label: 'A little of everything', sensed: ['body', 'family', 'purpose'] },
+    ],
+    pick: 0,
+  },
+  {
+    aria: 'You mentioned your brother. If that got easy again, what would it look like?',
+    choices: [
+      { label: 'One honest conversation', sensed: ['family'] },
+      { label: 'Time together, no agenda', sensed: ['family'] },
+      { label: 'Forgiveness, both ways', sensed: ['family'] },
+    ],
+    pick: 0,
+  },
+  {
+    aria: 'And when you picture feeling strong again, what is it really for?',
+    choices: [
+      { label: 'Just feeling like me again', sensed: ['body', 'purpose'] },
+      { label: 'Energy for my people', sensed: ['body', 'family'] },
+      { label: 'Proving I can keep a promise', sensed: ['purpose'] },
+    ],
+    pick: 0,
+  },
+];
+const DEMO_DEPTHS = [38, 70, 92];
+const DEMO_FINALE = 'Here is what I heard. You do not need a new life. You need yours back, one kept promise at a time. And I will remember every one.';
+
+function AriaDemo() {
+  const reduced = REDUCED();
+  const [runId, setRunId] = useState(0);
+  const [msgs, setMsgs] = useState([]);
+  const [live, setLive] = useState('');        // aria bubble currently typing
+  const [phase, setPhase] = useState('typing'); // typing | choosing | done
+  const [active, setActive] = useState([]);     // current step choices
+  const [picked, setPicked] = useState(-1);
+  const [depth, setDepth] = useState(0);
+  const [sensed, setSensed] = useState(() => new Set());
+  const threadRef = useRef(null);
+  const resolverRef = useRef(null);             // resolves the current waitPick
+
+  // keep the thread pinned to the newest line
+  useEffect(() => {
+    const el = threadRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [msgs, live, active, phase]);
+
+  useEffect(() => {
+    let alive = true;
+    const timers = [];
+    const sleep = (ms) => new Promise((r) => { const t = setTimeout(r, ms); timers.push(t); });
+
+    // reset for this run
+    setMsgs([]); setLive(''); setPhase('typing'); setActive([]);
+    setPicked(-1); setDepth(0); setSensed(new Set());
+
+    async function typeAria(text) {
+      setPhase('typing'); setActive([]); setPicked(-1); setLive('');
+      if (reduced) { setLive(text); return; }
+      for (let i = 1; i <= text.length; i++) {
+        if (!alive) return;
+        setLive(text.slice(0, i));
+        const ch = text[i - 1];
+        await sleep(/[.,?!]/.test(ch) ? 190 : 20 + Math.random() * 26);
+      }
+    }
+
+    function waitPick(step, idx) {
+      return new Promise((resolve) => {
+        if (reduced) { resolve(step.pick); return; }
+        resolverRef.current = (choiceIdx) => { resolverRef.current = null; resolve(choiceIdx); };
+        // auto-play: a beat to read, a visible "press", then commit
+        const t1 = setTimeout(() => { if (alive && resolverRef.current) setPicked(step.pick); }, 1500 + idx * 120);
+        const t2 = setTimeout(() => { if (alive && resolverRef.current) resolverRef.current(step.pick); }, 2000 + idx * 120);
+        timers.push(t1, t2);
+      });
+    }
+
+    async function run() {
+      for (let s = 0; s < DEMO_STEPS.length; s++) {
+        const step = DEMO_STEPS[s];
+        await typeAria(step.aria);
+        if (!alive) return;
+        setPhase('choosing'); setActive(step.choices); setPicked(-1);
+        const chosen = await waitPick(step, s);
+        if (!alive) return;
+        setPicked(chosen);
+        if (!reduced) await sleep(260);
+        const choice = step.choices[chosen] || step.choices[step.pick];
+        setMsgs((m) => [...m, { from: 'aria', text: step.aria }, { from: 'user', text: choice.label }]);
+        setLive(''); setActive([]);
+        setSensed((prev) => { const nx = new Set(prev); choice.sensed.forEach((x) => nx.add(x)); return nx; });
+        setDepth(DEMO_DEPTHS[s]);
+        await sleep(reduced ? 0 : 560);
+      }
+      await typeAria(DEMO_FINALE);
+      if (!alive) return;
+      setMsgs((m) => [...m, { from: 'aria', text: DEMO_FINALE }]);
+      setLive(''); setDepth(100); setPhase('done');
+    }
+    run();
+    return () => { alive = false; resolverRef.current = null; timers.forEach(clearTimeout); };
+  }, [runId, reduced]);
+
+  const choose = (i) => {
+    if (phase !== 'choosing') return;
+    setPicked(i);
+    const r = resolverRef.current;
+    if (r) r(i);
+  };
+
+  const thinking = phase === 'typing';
+
+  return (
+    <div className="kl-demo reveal">
+      <div className="kl-demo-head">
+        <span className={`aria-orb kl-demo-orb${thinking ? ' is-thinking' : ''}`} aria-hidden />
+        <div className="kl-demo-head-txt">
+          <span className="kl-demo-name">Aria</span>
+          <span className="kl-demo-status">
+            {phase === 'done' ? 'your life, mapped' : thinking ? 'listening, and thinking' : 'your turn'}
+          </span>
+        </div>
+        <div className="kl-demo-depth" aria-hidden>
+          <span className="kl-demo-depth-lbl">depth</span>
+          <span className="warmbar kl-demo-bar"><i style={{ width: `${depth}%` }} /></span>
+        </div>
+      </div>
+
+      <div className="kl-thread" ref={threadRef} aria-live="polite">
+        {msgs.map((m, i) => (
+          <div key={i} className={`kl-bubble ${m.from}`}>{m.text}</div>
+        ))}
+        {live && (
+          <div className="kl-bubble aria">
+            <span className={thinking ? 'type-caret' : undefined}>{live}</span>
+          </div>
+        )}
+      </div>
+
+      {phase === 'choosing' && active.length > 0 && (
+        <div className="kl-choices">
+          {active.map((c, i) => (
+            <button
+              key={i}
+              className={`kl-choice${picked === i ? ' picked' : ''}`}
+              style={{ animationDelay: `${i * 0.07}s` }}
+              onClick={() => choose(i)}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="kl-domrow" aria-hidden>
+        {DEMO_DOMAINS.map((d) => (
+          <span key={d.key} className={`kl-dom${sensed.has(d.key) ? ' lit' : ''}`}>
+            <span className="kl-dom-e">{d.emoji}</span>{d.label}
+          </span>
+        ))}
+      </div>
+
+      {phase === 'done' && (
+        <div className="kl-mapped">
+          <p className="kl-mapped-note">
+            That took three answers. Imagine what she holds after a real one.
+          </p>
+          <button className="kl-replay" onClick={() => setRunId((n) => n + 1)}>
+            <Icon name="refresh" size={16} /> watch again
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* Rotating glimpse of a real life in motion (the seeded demo life, Jordan). */
+const GLIMPSES = [
+  { t: 'Almost skipped the walk. Went anyway. That felt like the whole point.', d: 'day 6', dom: 'Body' },
+  { t: 'The chapter about the lake house basically wrote itself this morning. I forgot how good this feels.', d: 'day 3', dom: 'The book' },
+  { t: 'Saw a picture of Danny at the reunion. I was not there. Next year I will be.', d: 'yesterday', dom: 'Family' },
+];
+function Glimpse() {
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    if (REDUCED()) return;
+    const id = setInterval(() => setI((n) => (n + 1) % GLIMPSES.length), 5200);
+    return () => clearInterval(id);
+  }, []);
+  const g = GLIMPSES[i];
+  return (
+    <div className="kl-glimpse reveal">
+      <Icon name="quote" size={30} className="kl-glimpse-q" />
+      <p key={i} className="kl-glimpse-t">{g.t}</p>
+      <div className="kl-glimpse-meta">
+        <span className="badge badge-accent">{g.dom}</span>
+        <span className="muted t-sm">from a life in motion, {g.d}</span>
+      </div>
+      <div className="kl-glimpse-dots" aria-hidden>
+        {GLIMPSES.map((_, k) => <span key={k} className={k === i ? 'on' : ''} />)}
+      </div>
+    </div>
   );
 }
 
@@ -77,6 +303,13 @@ const STEPS = [
   { icon: 'compass', t: 'Map your life', d: 'Faith, body, people, work, the book you keep meaning to write. All held in one place.' },
   { icon: 'sun', t: 'Daily guidance', d: 'Every morning, the next small, kept promise. Nothing overwhelming, ever.' },
   { icon: 'trophy', t: 'Watch it grow', d: 'Streaks, wins, and patterns Aria remembers so your life compounds over time.' },
+];
+
+const TRUST = [
+  { icon: 'leaf', t: 'Private by design', d: 'Everything you share stays in your space. No ads, no selling you.' },
+  { icon: 'mic', t: 'One honest talk', d: 'No sign-up wall, no forms. Just a few real questions to start.' },
+  { icon: 'sparkles', t: 'She remembers', d: 'Every promise, every win, every name. Your life compounds.' },
+  { icon: 'refresh', t: 'Yours to keep or clear', d: 'Export it or delete all of it in one tap, anytime.' },
 ];
 
 // A curated constellation of the life Kindred can hold together.
@@ -137,11 +370,36 @@ function Constellation() {
 export default function Landing() {
   const nav = useNavigate();
   const root = useReveal();
+  const heroRef = useRef(null);
+  const [sticky, setSticky] = useState(false);
+
+  // Sticky CTA fades in once the hero (and its buttons) have scrolled away.
+  useEffect(() => {
+    const el = heroRef.current;
+    if (!el || !('IntersectionObserver' in window)) return;
+    const io = new IntersectionObserver(
+      ([e]) => setSticky(!e.isIntersecting),
+      { rootMargin: '-40% 0px 0px 0px' }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  // Meeting Aria should feel like a small celebration.
+  const meetAria = (e) => {
+    try {
+      const r = e && e.currentTarget && e.currentTarget.getBoundingClientRect();
+      if (r) celebrate({ x: r.left + r.width / 2, y: r.top + r.height / 2, count: 80, spread: 1 });
+    } catch {}
+    nav('/welcome');
+  };
 
   return (
     <div className="k-landing" ref={root}>
+      <LandingStyles />
+
       {/* ---------------- HERO ---------------- */}
-      <header className="k-hero">
+      <header className="k-hero" ref={heroRef}>
         <div className="k-aura" aria-hidden><b className="a1" /><b className="a2" /><b className="a3" /><b className="a4" /></div>
 
         <div className="k-hero__inner">
@@ -167,7 +425,7 @@ export default function Landing() {
 
           <div className="k-cta-row reveal reveal-d1">
             <span className="k-pulse">
-              <button className="btn btn-warm btn-lg" onClick={() => nav('/welcome')}>
+              <button className="btn btn-warm btn-lg" onClick={meetAria}>
                 Say hi to Aria <Icon name="arrowRight" size={19} />
               </button>
             </span>
@@ -178,11 +436,30 @@ export default function Landing() {
           </div>
 
           <div className="k-scroll-cue" aria-hidden>
-            <span>See how</span>
+            <span>Meet her</span>
             <Icon name="chevronRight" size={22} className="ch" style={{ transform: 'rotate(90deg)' }} />
           </div>
         </div>
       </header>
+
+      {/* ---------------- ARIA DEMO (the magic, shown) ---------------- */}
+      <section className="k-section kl-demo-sec">
+        <div className="k-wrap">
+          <div className="k-section__head reveal">
+            <span className="k-section__eyebrow">See the magic</span>
+            <h2 className="k-section__title">Watch a life get mapped in three answers</h2>
+            <p className="k-section__sub">This is the real interview. Aria follows what you actually say, senses what matters, and hands your life back to you. Tap an answer, or just watch.</p>
+          </div>
+          <AriaDemo />
+          <div className="kl-demo-cta reveal">
+            <span className="k-pulse">
+              <button className="btn btn-warm btn-lg" onClick={meetAria}>
+                Now do it for real <Icon name="arrowRight" size={19} />
+              </button>
+            </span>
+          </div>
+        </div>
+      </section>
 
       {/* ---------------- HOW IT WORKS ---------------- */}
       <section className="k-section">
@@ -229,6 +506,28 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* ---------------- TRUST ---------------- */}
+      <section className="k-section" style={{ paddingTop: '1rem' }}>
+        <div className="k-wrap">
+          <div className="k-section__head reveal">
+            <span className="k-section__eyebrow">Why people let her in</span>
+            <h2 className="k-section__title">The kind of company you can actually trust</h2>
+          </div>
+          <div className="kl-trust">
+            {TRUST.map((t, i) => (
+              <div key={t.t} className="kl-trust-card reveal" style={{ transitionDelay: `${i * 0.07}s` }}>
+                <span className="kl-trust-ic"><Icon name={t.icon} size={22} /></span>
+                <div className="kl-trust-t serif">{t.t}</div>
+                <p className="kl-trust-d">{t.d}</p>
+              </div>
+            ))}
+          </div>
+          <div className="kl-glimpse-wrap">
+            <Glimpse />
+          </div>
+        </div>
+      </section>
+
       {/* ---------------- HONEST STATS ---------------- */}
       <section className="k-section" style={{ paddingTop: '1rem' }}>
         <div className="k-wrap">
@@ -262,7 +561,7 @@ export default function Landing() {
               One kept promise at a time, with someone who remembers every one. Say hi whenever you are ready.
             </p>
             <span className="k-pulse" style={{ display: 'inline-block' }}>
-              <button className="btn btn-warm btn-lg" onClick={() => nav('/welcome')}>
+              <button className="btn btn-warm btn-lg" onClick={meetAria}>
                 Meet Aria <Icon name="arrowRight" size={19} />
               </button>
             </span>
@@ -274,6 +573,132 @@ export default function Landing() {
       </section>
 
       <footer className="k-foot">Kindred, your life, with company.</footer>
+
+      {/* ---------------- STICKY CTA ---------------- */}
+      <div className={`kl-sticky${sticky ? ' show' : ''}`} aria-hidden={!sticky}>
+        <button className="btn btn-warm" onClick={meetAria} tabIndex={sticky ? 0 : -1}>
+          Say hi to Aria <Icon name="arrowRight" size={17} />
+        </button>
+      </div>
     </div>
+  );
+}
+
+/* ============================================================
+   Scoped styles for the new landing moments. Kept here (not in
+   index.css) so this file owns its own surface. Warm palette,
+   reduced-motion aware, mobile-first. Prefixed kl- to avoid
+   any collision with the shared design system.
+   ============================================================ */
+function LandingStyles() {
+  return (
+    <style>{`
+.kl-demo-sec { padding-top: 3.4rem; }
+
+/* --- Aria demo card --- */
+.kl-demo {
+  max-width: 560px; margin: 0 auto; background: var(--paper);
+  border: 1px solid var(--line); border-radius: var(--r-xl);
+  box-shadow: var(--shadow-lg); padding: 1.2rem 1.2rem 1.3rem;
+  position: relative; overflow: hidden;
+}
+.kl-demo::before {
+  content: ''; position: absolute; inset: 0 0 auto 0; height: 4px;
+  background: linear-gradient(90deg, #e0794e, #d95d78 55%, #dd9a2e);
+}
+.kl-demo-head { display: flex; align-items: center; gap: .7rem; padding-bottom: .9rem; border-bottom: 1px solid var(--line); }
+.kl-demo-orb { width: 40px; height: 40px; }
+.kl-demo-head-txt { display: flex; flex-direction: column; line-height: 1.15; }
+.kl-demo-name { font-family: var(--font-display); font-weight: 600; font-size: 1.12rem; color: var(--ink); }
+.kl-demo-status { font-size: .82rem; color: var(--n-600); }
+.kl-demo-depth { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: .3rem; width: 100px; }
+.kl-demo-depth-lbl { font-size: .68rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--n-400); }
+.kl-demo-bar { width: 100%; }
+
+.kl-thread {
+  display: flex; flex-direction: column; gap: .55rem;
+  padding: 1rem .2rem; min-height: 210px; max-height: 300px; overflow-y: auto; scroll-behavior: smooth;
+}
+.kl-bubble {
+  max-width: 82%; padding: .7rem .95rem; border-radius: 18px; font-size: 1.02rem; line-height: 1.5;
+  animation: klBubble .42s var(--ease) both; word-break: break-word;
+}
+.kl-bubble.aria { align-self: flex-start; background: var(--n-25); color: var(--ink); border: 1px solid var(--line); border-bottom-left-radius: 6px; }
+.kl-bubble.user { align-self: flex-end; background: linear-gradient(120deg, #e0794e, #d95d78); color: #fff; border-bottom-right-radius: 6px; box-shadow: var(--accent-glow); }
+@keyframes klBubble { from { opacity: 0; transform: translateY(10px) scale(.98); } to { opacity: 1; transform: none; } }
+
+.kl-choices { display: flex; flex-direction: column; gap: .5rem; padding-top: .35rem; }
+.kl-choice {
+  text-align: left; width: 100%; background: var(--paper); border: 1.5px solid var(--line);
+  border-radius: var(--r-md); padding: .74rem 1rem; font-size: 1rem; font-weight: 550; color: var(--ink);
+  cursor: pointer; transition: border-color .16s, background .16s, transform .16s var(--ease), box-shadow .16s;
+  animation: klBubble .4s var(--ease) both;
+}
+.kl-choice:hover { border-color: var(--accent-300); background: var(--accent-50); transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+.kl-choice.picked { border-color: transparent; background: linear-gradient(120deg, #e0794e, #d95d78); color: #fff; transform: translateY(0) scale(.99); box-shadow: var(--accent-glow); }
+
+.kl-domrow { display: flex; flex-wrap: wrap; gap: .45rem; padding-top: 1rem; margin-top: .9rem; border-top: 1px dashed var(--line-strong); }
+.kl-dom {
+  display: inline-flex; align-items: center; gap: .35rem; font-size: .86rem; font-weight: 650;
+  padding: .3rem .7rem; border-radius: 999px; background: var(--n-25); color: var(--n-400);
+  border: 1px solid var(--line); opacity: .6; filter: grayscale(.7);
+  transition: all .4s var(--ease);
+}
+.kl-dom-e { font-size: 1rem; }
+.kl-dom.lit { opacity: 1; filter: none; color: var(--accent-700); background: var(--accent-50); border-color: var(--accent-300); box-shadow: var(--shadow-sm); transform: translateY(-1px); }
+
+.kl-mapped { text-align: center; padding-top: 1rem; animation: klBubble .5s var(--ease) both; }
+.kl-mapped-note { font-family: var(--font-display); font-size: 1.1rem; color: var(--ink); margin-bottom: .7rem; }
+.kl-replay {
+  display: inline-flex; align-items: center; gap: .4rem; background: none; border: none;
+  color: var(--accent-600); font-weight: 650; font-size: .95rem; cursor: pointer; padding: .3rem .5rem; border-radius: 999px;
+}
+.kl-replay:hover { text-decoration: underline; }
+.kl-demo-cta { text-align: center; margin-top: 1.9rem; }
+
+/* --- Trust band --- */
+.kl-trust { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+.kl-trust-card { background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 1.3rem 1.15rem; box-shadow: var(--shadow-sm); transition: transform .2s var(--ease), box-shadow .2s var(--ease), border-color .2s var(--ease); }
+.kl-trust-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-md); border-color: var(--accent-300); }
+.kl-trust-ic { width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; background: var(--accent-50); color: var(--accent-700); margin-bottom: .7rem; }
+.kl-trust-card:nth-child(2) .kl-trust-ic { background: var(--rose-bg); color: var(--rose); }
+.kl-trust-card:nth-child(3) .kl-trust-ic { background: var(--gold-bg); color: var(--gold); }
+.kl-trust-card:nth-child(4) .kl-trust-ic { background: var(--sage-bg); color: var(--sage); }
+.kl-trust-t { font-size: 1.1rem; font-weight: 600; margin-bottom: .25rem; }
+.kl-trust-d { font-size: .95rem; line-height: 1.5; color: var(--n-700); }
+@media (max-width: 760px) { .kl-trust { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 460px) { .kl-trust { grid-template-columns: 1fr; } }
+
+/* --- Glimpse quote --- */
+.kl-glimpse-wrap { margin-top: 1.8rem; }
+.kl-glimpse {
+  position: relative; max-width: 620px; margin: 0 auto; text-align: center;
+  background: linear-gradient(135deg, var(--accent-50), var(--rose-bg) 60%, var(--gold-bg));
+  border: 1px solid var(--line); border-radius: var(--r-xl); padding: 2.2rem 1.8rem 1.7rem;
+}
+[data-theme="dark"] .kl-glimpse { background: linear-gradient(135deg, #2b1a14, #2a1620 60%, #2a2110); }
+.kl-glimpse-q { color: var(--accent-300); opacity: .8; margin-bottom: .4rem; }
+.kl-glimpse-t { font-family: var(--font-display); font-size: clamp(1.2rem, 2.5vw, 1.55rem); line-height: 1.4; color: var(--ink); margin: 0 auto; max-width: 32ch; animation: klFade .6s var(--ease) both; }
+@keyframes klFade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.kl-glimpse-meta { display: flex; align-items: center; justify-content: center; gap: .6rem; margin-top: 1rem; flex-wrap: wrap; }
+.kl-glimpse-dots { display: flex; justify-content: center; gap: .4rem; margin-top: 1rem; }
+.kl-glimpse-dots span { width: 7px; height: 7px; border-radius: 999px; background: var(--n-200); transition: background .3s, transform .3s; }
+.kl-glimpse-dots span.on { background: var(--accent); transform: scale(1.25); }
+
+/* --- Sticky CTA --- */
+.kl-sticky {
+  position: fixed; left: 50%; bottom: calc(1.1rem + env(safe-area-inset-bottom)); transform: translate(-50%, 140%);
+  z-index: 60; opacity: 0; pointer-events: none; transition: transform .4s var(--ease), opacity .3s var(--ease);
+}
+.kl-sticky.show { transform: translate(-50%, 0); opacity: 1; pointer-events: auto; }
+.kl-sticky .btn { box-shadow: var(--accent-glow), var(--shadow-lg); padding: .82rem 1.4rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  .kl-bubble, .kl-choice, .kl-mapped, .kl-glimpse-t { animation: none !important; }
+  .kl-thread { scroll-behavior: auto; }
+  .kl-dom { transition: none; }
+  .kl-sticky { transition: opacity .2s linear; }
+}
+    `}</style>
   );
 }
