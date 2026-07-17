@@ -4,9 +4,9 @@
 // all. Warm, calm, honest - the surfaces that earn the right to hold a life.
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, Button, Field, Input, SectionHeader, useToast } from '../components/UI.jsx';
+import { Card, Button, Field, Input, Select, SectionHeader, useToast } from '../components/UI.jsx';
 import { Icon } from '../components/icons.jsx';
-import { useStore, getProfile, saveSettings, resetStore, exportData, domainMeta, TONES } from '../lib/store.js';
+import { useStore, getProfile, saveSettings, resetStore, exportData, domainMeta, TONES, setFaith, getFaith, FAITH_TRADITIONS } from '../lib/store.js';
 import { onAccount, getAccount, signup, login, logout, forgetAccountLocal, authHeader } from '../lib/account.js';
 import { enablePush, disablePush, pushSupported, notificationPermission } from '../lib/push.js';
 import { speak, speechAvailable } from '../lib/voice.js';
@@ -74,6 +74,47 @@ function AuthCard({ account }) {
   );
 }
 
+// Faith and values: warm, optional, inclusive. We ask once, store what they
+// choose, and only ever personalize (a daily reflection, Aria's tone). Never
+// gate, never assume, never preach. "Prefer not to say" is a first-class answer.
+function FaithCard() {
+  const toast = useToast();
+  const faith = getFaith();
+  const [tradition, setTradition] = useState(faith?.tradition || '');
+  const [importance, setImportance] = useState(faith?.importance || '');
+
+  const save = () => {
+    const r = setFaith({ tradition, importance, opted: !!tradition });
+    if (r.error) return toast(r.message, 'warn');
+    toast(tradition ? 'Saved. Aria will honor this gently.' : 'Saved.', 'ok');
+  };
+
+  return (
+    <Card pad={22}>
+      <div className="col gap-2">
+        <span className="fw-7 row gap-1" style={{ fontSize: '1.05rem' }}><Icon name="sun" size={18} /> Faith and values</span>
+        <span className="muted t-sm">
+          Optional, and yours. If a faith or set of values matters to you, Aria can honor it - a quiet daily reflection in your tradition, a gentler tone on hard days. If not, leave it blank and it never comes up. Nothing here is ever shared or used to judge you.
+        </span>
+        <div className="col gap-2" style={{ marginTop: '.4rem' }}>
+          <Field label="What best describes your path? (optional)">
+            <Select value={tradition} onChange={e => setTradition(e.target.value)}>
+              <option value="">Skip this / not now</option>
+              {FAITH_TRADITIONS.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+            </Select>
+          </Field>
+          {tradition && tradition !== 'secular' && tradition !== 'private' && (
+            <Field label="What does it give you? (optional)" hint="One line, in your words. Helps Aria speak to it the right way.">
+              <Input placeholder="It steadies me / keeps me grounded / connects me to family" value={importance} onChange={e => setImportance(e.target.value)} />
+            </Field>
+          )}
+          <Button variant="primary" onClick={save} style={{ alignSelf: 'flex-start' }}>Save</Button>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 export default function Settings() {
   const profile = useStore(s => s.profile);
   const settings = useStore(s => s.settings);
@@ -134,6 +175,9 @@ export default function Settings() {
       <SectionHeader eyebrow="Settings" title="You, in control" sub="Your account, your voice, your data. Nothing here is out of your hands." />
 
       <AuthCard account={account} />
+
+      {/* Faith and values - optional, inclusive, never gated */}
+      {profile && <FaithCard />}
 
       {/* Aria's voice + daily nudge */}
       <Card pad={22}>

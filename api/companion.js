@@ -25,9 +25,11 @@ const SCHEMA = {
       items: {
         type: 'object',
         properties: {
-          kind: { type: 'string', enum: ['navigate', 'set_goal', 'log_win', 'add_person', 'add_journal', 'add_rec', 'draft_message', 'check_in'] },
+          kind: { type: 'string', enum: ['navigate', 'set_goal', 'mark_goal_done', 'log_win', 'add_person', 'add_journal', 'add_rec', 'draft_message', 'check_in', 'reflect'] },
           label: { type: 'string' },
           to: { type: 'string', description: 'for navigate' },
+          goalTitle: { type: 'string', description: 'for mark_goal_done: the exact title of an existing goal from the snapshot to log a rep on today' },
+          reflection: { type: 'object', properties: { rating: { type: 'number', description: '1-5 how the day went' }, gratitude: { type: 'string' } }, description: 'for reflect: close out the day' },
           goal: { type: 'object', properties: { title: { type: 'string' }, domainId: { type: 'string' }, why: { type: 'string' }, cadence: { type: 'string', enum: ['daily', 'weekly'] } } },
           win: { type: 'object', properties: { title: { type: 'string' }, detail: { type: 'string' }, domainId: { type: 'string' } } },
           person: { type: 'object', properties: { name: { type: 'string' }, relation: { type: 'string' }, intent: { type: 'string' } } },
@@ -53,6 +55,9 @@ function snapshotToText(s) {
     L.push(`Their profile summary: ${p.summary}`);
     if (p.belief) L.push(`The belief you hold for them: ${p.belief}`);
     if (Array.isArray(p.domains)) L.push('THEIR DOMAINS: ' + p.domains.map(d => `${d.name} (${d.id}) - ${d.why}`).join(' | '));
+    if (p.faith && p.faith.opted && p.faith.tradition && !['secular', 'private'].includes(p.faith.tradition)) {
+      L.push(`FAITH AND VALUES: ${p.faith.tradition}${p.faith.importance ? ` ("${p.faith.importance}")` : ''}. Honor this gently when it naturally fits; never preach, never assume, never force it in.`);
+    }
   }
   if (Array.isArray(s.goals) && s.goals.length) {
     L.push(`GOALS (${s.goals.length}) [title | domain | cadence | streak | last done | status]:`);
@@ -75,7 +80,8 @@ function snapshotToText(s) {
   if (Array.isArray(s.recs) && s.recs.length) {
     L.push('OPEN RECOMMENDATIONS: ' + s.recs.map(r => `${r.kind}: ${r.title}`).join('; '));
   }
-  if (s.today) L.push(`TODAY: ${s.today.date}. Mood logged today: ${s.today.mood ?? 'not yet'}.`);
+  if (s.today) L.push(`TODAY: ${s.today.date}. Morning mood: ${s.today.mood ?? 'not logged yet'}. Evening reflection: ${s.today.reflected ? `done (rated ${s.today.reflected})` : 'not yet'}.`);
+  if (typeof s.ritualStreak === 'number') L.push(`RITUAL STREAK: ${s.ritualStreak} day(s) fully closed (check in + moves + reflect). This is the streak that matters most - protect it.`);
   return L.join('\n');
 }
 
@@ -98,7 +104,8 @@ const SYSTEM = (snapText, path, tone) => [
   '- WHY THEY FEEL OFF: when they say they are down or stuck, connect it to what you actually see (mood trend, a stalled goal, a person they miss) and give ONE concrete thing to do in the next hour, not a lecture.',
   '- BOOKS + PRACTICES: when recommending, tailor to their profile and current moment, and attach an add_rec action so it lands in their For you list. For books give the real title and author and one sentence on why it fits THEM.',
   '- RELATIONSHIPS: for reconnecting or hard conversations, offer a draft_message action with a real, sendable text in a voice that sounds like a person, not a card.',
-  '- ACTIONS (propose, they confirm): set_goal (small, concrete, cadence daily or weekly, domainId from their domains), log_win, add_person, add_journal (their words, first person), add_rec, check_in, draft_message.',
+  '- ACTIONS (propose, they confirm): set_goal (small, concrete, cadence daily or weekly, domainId from their domains), mark_goal_done (when they say they did a goal, e.g. "I did my walk" - pass the exact goalTitle from the snapshot so it logs the rep and streak), log_win, add_person, add_journal (their words, first person), add_rec, check_in, reflect (close out the day when it is evening or they are recapping - pass a 1-5 rating and a short gratitude), draft_message.',
+  '- FAITH: if they have a faith or values in the snapshot, you may gently draw on it when it genuinely fits (a hard day, gratitude, a hard choice). Never preach, never quote scripture you are unsure of, never assume. If they have none, never bring it up.',
   '- CALL-OUTS: if they said they would do something and did not, and their tone is coach or challenger, name it honestly. If nurturer, name it softly and shrink the next step.',
   '- Keep reply tight (2-5 sentences). Offer 2-3 suggestions.',
   '',

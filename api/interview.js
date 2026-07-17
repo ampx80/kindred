@@ -44,12 +44,22 @@ const SCHEMA = {
           items: {
             type: 'object',
             properties: {
-              id: { type: 'string', enum: DOMAINS },
+              id: { type: 'string', description: `Use one of the standard ids when it fits: ${DOMAINS.join(', ')}. If their focus is a specific hobby, habit, or interest that does NOT fit (e.g. chess, watching more TV, guitar, gardening, a language, gaming), invent a short lowercase custom id like "x_chess" and set a fitting emoji.` },
               name: { type: 'string', description: 'Their version of it, e.g. "Rebuilding strength" not just "fitness".' },
+              emoji: { type: 'string', description: 'A single fitting emoji, required for custom (non-standard) domains, optional otherwise.' },
               why: { type: 'string', description: 'One sentence, grounded in what they said.' },
               firstGoal: { type: 'string', description: 'A small, concrete first goal (doable this week).' },
             },
             required: ['id', 'name', 'why', 'firstGoal'],
+          },
+        },
+        faith: {
+          type: ['object', 'null'],
+          description: 'ONLY if faith, spirituality, or a values system genuinely came up. null if it did not - never invent it. tradition uses their own words mapped to the closest option.',
+          properties: {
+            tradition: { type: 'string', enum: ['christian', 'catholic', 'muslim', 'jewish', 'hindu', 'buddhist', 'spiritual', 'seeking', 'secular', 'private'] },
+            importance: { type: 'string', description: 'One short phrase in their words for what it gives them.' },
+            opted: { type: 'boolean' },
           },
         },
         tone: { type: 'string', enum: ['nurturer', 'coach', 'challenger'] },
@@ -73,6 +83,13 @@ HOW YOU INTERVIEW:
 - Read tone: hesitant, hurting people get softer questions; driven, blunt people get more direct ones.
 - done: set true once you can write a profile that would make them feel truly seen (usually 6-10 answers). Never drag past 12.
 - When done=true, write the profile with real care. summary in second person, their own words woven in. firstGoal items must be small and concrete (this week, not this year).
+
+FAITH AND VALUES (handle with real care):
+- If faith, spirituality, religion, or a guiding set of values comes up naturally, you may follow it warmly - never lead with it, never assume one, never push. A good gentle way in, only if it fits the thread: "Does faith or a set of beliefs play a part in how you want to live?" Let them decline easily.
+- If they share a tradition, capture it in profile.faith with their closest tradition and one phrase for what it gives them. If they are not religious, that is completely valid - set tradition "secular". If they would rather not say, set "private". If it never came up, leave faith null. Never fabricate a faith.
+
+ANY GOAL, ANY LIFE (this matters):
+- People care about all kinds of things - the gym and scripture, but also chess, watching more TV to unwind, learning guitar, gardening, a video game, a language. Take every one of these seriously and give it a home. If a focus does not fit the standard domains, create a custom domain id (like "x_chess") with a fitting emoji. Never flatten a real interest into a generic bucket.
 
 ABSOLUTE RULES:
 - Never use an em dash or en dash. Use a normal hyphen.

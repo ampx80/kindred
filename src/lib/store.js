@@ -29,7 +29,121 @@ export const DOMAIN_META = {
   health: { emoji: '🫀', color: 'var(--accent-600)', bg: 'var(--accent-50)' },
   community: { emoji: '🏘️', color: 'var(--sage)', bg: 'var(--sage-bg)' },
 };
-export const domainMeta = (id) => DOMAIN_META[id] || { emoji: '✨', color: 'var(--accent-600)', bg: 'var(--accent-50)' };
+// Resolves a domain's look from the fixed set OR a user-created custom domain
+// (chess, watching more TV, gardening - anything they said matters). Custom
+// domains carry their own emoji/color on the profile so any life goal has a home.
+export const domainMeta = (id) => {
+  if (DOMAIN_META[id]) return DOMAIN_META[id];
+  const custom = ((state && state.profile && state.profile.customDomains) || []).find(d => d.id === id);
+  if (custom) return { emoji: custom.emoji || '✨', color: custom.color || 'var(--accent-600)', bg: custom.bg || 'var(--accent-50)' };
+  const pd = ((state && state.profile && state.profile.domains) || []).find(d => d.id === id);
+  if (pd && pd.emoji) return { emoji: pd.emoji, color: 'var(--accent-600)', bg: 'var(--accent-50)' };
+  return { emoji: '✨', color: 'var(--accent-600)', bg: 'var(--accent-50)' };
+};
+
+// Faith and values - optional, inclusive, never gated. We ask warmly, store the
+// tradition they choose (or "prefer not to say"), and only ever personalize -
+// never require, never assume, never preach. Modeled on how the big faith apps
+// stay welcoming to everyone (Hallow/Pray are "agnostic to who comes on").
+export const FAITH_TRADITIONS = [
+  { id: 'christian', label: 'Christian' },
+  { id: 'catholic', label: 'Catholic' },
+  { id: 'muslim', label: 'Muslim' },
+  { id: 'jewish', label: 'Jewish' },
+  { id: 'hindu', label: 'Hindu' },
+  { id: 'buddhist', label: 'Buddhist' },
+  { id: 'spiritual', label: 'Spiritual, not religious' },
+  { id: 'seeking', label: 'Still exploring' },
+  { id: 'secular', label: 'Not religious' },
+  { id: 'private', label: 'Prefer not to say' },
+];
+
+// Daily reflective prompts, flavored to a tradition. These are Kindred's own
+// gentle prompts (not quoted scripture, so nothing is ever misattributed), warm
+// and never preachy. Secular / private get none (returns null).
+const FAITH_PROMPTS = {
+  christian: [
+    'Where could you show a little more grace today - to someone else, or to yourself?',
+    'What is one thing you can trust God with today instead of carrying alone?',
+    'Who in your life could use an unprompted word of encouragement from you?',
+    'What would loving your neighbor look like in one small, concrete act today?',
+    'Before the day fills up, what are you genuinely thankful for right now?',
+    'Where is a quiet five minutes today you could give to prayer or stillness?',
+  ],
+  catholic: [
+    'A small examen: where did you feel most alive yesterday, and where drained?',
+    'What is one thing to offer up today, and one grace to ask for?',
+    'Who could you carry in prayer today?',
+    'Where can you choose patience over hurry today?',
+    'What are you grateful for this morning?',
+    'What is one small act of service within reach today?',
+  ],
+  muslim: [
+    'What is one thing you are grateful to have been given today?',
+    'Where could a little more patience serve you today?',
+    'Who could you show kindness to today without being asked?',
+    'What intention do you want to set before the day begins?',
+    'Where is a quiet moment today for remembrance or reflection?',
+    'What is one small good deed within reach today?',
+  ],
+  jewish: [
+    'What is one thing worthy of a blessing today, big or small?',
+    'Where could a small act of repair fit into your day?',
+    'Who could you reach out to and strengthen today?',
+    'What would bringing a little more calm into today look like?',
+    'What are you grateful for this morning?',
+    'Where can you choose generosity today?',
+  ],
+  hindu: [
+    'What intention would you like to carry into today?',
+    'Where can you act today without clinging to the outcome?',
+    'What is one thing you are grateful for this morning?',
+    'Where could a few quiet breaths steady you today?',
+    'Who could you serve or uplift today?',
+    'What would acting from your best self look like in one moment today?',
+  ],
+  buddhist: [
+    'Where can you bring a little more presence to something ordinary today?',
+    'What is one thing you can meet with acceptance instead of resistance?',
+    'Who could you offer a moment of genuine kindness to today?',
+    'Take three slow breaths. What do you notice right now?',
+    'What are you grateful for in this moment?',
+    'Where could you loosen your grip on something today?',
+  ],
+  spiritual: [
+    'What would feeding your spirit, not just your to-do list, look like today?',
+    'Where can you pause and feel connected to something larger today?',
+    'What are you grateful for this morning?',
+    'Who could you show quiet kindness to today?',
+    'Where is a still moment today you could actually take?',
+    'What does your gut say you need more of right now?',
+  ],
+  seeking: [
+    'No pressure to have answers. What question about your life is quietly with you today?',
+    'What has given you a sense of meaning lately, even in small doses?',
+    'What are you grateful for this morning?',
+    'Where could a quiet moment of reflection fit today?',
+    'Who or what makes you feel most like yourself?',
+    'What would tending your inner life look like today?',
+  ],
+};
+
+// Surprise "sparks" - a variable reward on a fully closed day. Not every time
+// (that is the point: unpredictable warmth lands harder than predictable praise).
+const SPARKS = [
+  'You closed the loop today. Morning, moves, and an honest look back. That is a full day, kept.',
+  'Full rings. Days like this are the ones that quietly change everything.',
+  'You showed up for your whole day, start to finish. I noticed. Proud of you.',
+  'Complete. This is what it looks like when someone actually means it.',
+  'That is a whole day, honored. Rest easy tonight - you earned it.',
+  'You did the thing most people skip: you finished the day on purpose.',
+];
+
+const isoDay = (d) => d.toISOString().slice(0, 10);
+const dayIndex = () => {
+  const now = new Date();
+  return now.getFullYear() * 366 + Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 86400000);
+};
 
 export const TONES = {
   nurturer: { name: 'Nurturer', line: 'gentle, patient, zero pressure' },
@@ -43,9 +157,10 @@ const nowIso = () => new Date().toISOString();
 
 function blank() {
   return {
-    profile: null,     // set by the interview: { name, summary, domains[], tone, toneWhy, belief, answers[], createdAt, demo? }
+    profile: null,     // set by the interview: { name, summary, domains[], customDomains[], faith?, tone, toneWhy, belief, answers[], createdAt, demo? }
     goals: [],         // { id, domainId, title, why, cadence, streak, best, lastDoneAt, status, createdAt }
-    checkins: [],      // { id, date, mood 1-5, note }
+    checkins: [],      // { id, date, mood 1-5, note } - the MORNING beat
+    reflections: [],   // { id, date, rating 1-5, gratitude, note, at } - the EVENING beat
     journal: [],       // { id, at, text, source }
     people: [],        // { id, name, relation, intent, notes, lastTouch }
     wins: [],          // { id, at, title, detail, domainId }
@@ -168,9 +283,14 @@ export function completeProfile(profile) {
       goals.push({ id: uid(), domainId: d.id, title: d.firstGoal, why: d.why || '', cadence: 'daily', streak: 0, best: 0, lastDoneAt: null, status: 'active', createdAt: nowIso() });
     }
   }
+  // Any domain the interview surfaced that is not one of the fixed set is a
+  // custom life area (chess, TV, gardening...). Register its look so it renders.
+  const customDomains = (profile.domains || [])
+    .filter(d => !DOMAIN_META[d.id])
+    .map(d => ({ id: d.id, emoji: d.emoji || '✨', color: 'var(--accent-600)', bg: 'var(--accent-50)' }));
   commit({
     ...state,
-    profile: { ...profile, createdAt: nowIso() },
+    profile: { ...profile, customDomains, createdAt: nowIso() },
     goals: [...state.goals, ...goals],
     wins: [...state.wins, { id: uid(), at: nowIso(), title: 'Met Aria and mapped your life', detail: 'The day this started.', domainId: profile.domains[0]?.id || 'purpose' }],
   });
@@ -340,6 +460,120 @@ export function saveSettings(patch) {
   return { settings: state.settings };
 }
 
+/* ---------------- FAITH + VALUES (optional, inclusive) ---------------- */
+export const getFaith = () => (state.profile && state.profile.faith) || null;
+// SUPABASE: update profiles set faith = jsonb
+export function setFaith({ tradition = '', importance = '', opted = true } = {}) {
+  if (!state.profile) return { error: true, message: 'Let us get to know you first.' };
+  const faith = { tradition, importance, opted: !!opted, setAt: nowIso() };
+  commit({ ...state, profile: { ...state.profile, faith } });
+  track('faith_set');
+  return { faith };
+}
+// A daily, tradition-flavored reflection prompt. Only for people who opted in
+// and chose a tradition that wants it. Warm, never preachy, never a fake quote.
+export function faithReflection() {
+  const f = getFaith();
+  if (!f || !f.opted || !f.tradition || f.tradition === 'secular' || f.tradition === 'private') return null;
+  const lib = FAITH_PROMPTS[f.tradition] || FAITH_PROMPTS.spiritual;
+  return { text: lib[dayIndex() % lib.length], tradition: f.tradition };
+}
+
+/* ---------------- CUSTOM DOMAINS (any goal gets a home) ---------------- */
+// SUPABASE: insert into domains (user-scoped)
+export function addCustomDomain({ name, emoji = '✨', color = 'var(--accent-600)', why = '' }) {
+  if (!state.profile) return { error: true, message: 'Let us get to know you first.' };
+  if (!name || !name.trim()) return { error: true, message: 'Name the area of life.' };
+  const clean = name.trim();
+  const dup = (state.profile.domains || []).find(d => d.name.toLowerCase() === clean.toLowerCase());
+  if (dup) return { domain: dup };
+  const id = 'x_' + clean.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 22) + '_' + uid().slice(0, 4);
+  const domain = { id, name: clean, why, emoji, custom: true };
+  const domains = [...(state.profile.domains || []), domain];
+  const customDomains = [...(state.profile.customDomains || []), { id, emoji, color, bg: 'var(--accent-50)' }];
+  commit({ ...state, profile: { ...state.profile, domains, customDomains } });
+  track('domain_added');
+  return { domain };
+}
+
+/* ---------------- EVENING REFLECTION (the second daily beat) ---------------- */
+export const getReflections = () => state.reflections || [];
+export const getTodayReflection = () => (state.reflections || []).find(r => r.date === todayStr());
+// SUPABASE: upsert into reflections (one per day)
+export function addReflection({ rating, gratitude = '', note = '' }) {
+  const m = Number(rating);
+  if (!(m >= 1 && m <= 5)) return { error: true, message: 'Rate the day 1 to 5.' };
+  const date = todayStr();
+  const existing = (state.reflections || []).find(r => r.date === date);
+  const reflections = existing
+    ? state.reflections.map(r => r.date === date ? { ...r, rating: m, gratitude: gratitude || r.gratitude, note: note || r.note } : r)
+    : [...(state.reflections || []), { id: uid(), date, rating: m, gratitude, note, at: nowIso() }];
+  commit({ ...state, reflections });
+  // Fold gratitude into the journal so the record compounds and Aria can read it back.
+  if (!existing && gratitude && gratitude.trim()) addJournal(`Grateful today: ${gratitude.trim()}`, 'reflection');
+  track('reflection');
+  return { reflection: (state.reflections || []).find(r => r.date === date), first: !existing };
+}
+
+// Consecutive days that had a check-in (exported so Today and Growth share one truth).
+export function checkinStreak() {
+  const days = new Set(state.checkins.map(c => c.date));
+  const d = new Date();
+  if (!days.has(isoDay(d))) d.setDate(d.getDate() - 1);
+  let n = 0; while (days.has(isoDay(d))) { n++; d.setDate(d.getDate() - 1); }
+  return n;
+}
+// Consecutive days closed with an evening reflection.
+export function reflectionStreak() {
+  const days = new Set((state.reflections || []).map(r => r.date));
+  const d = new Date();
+  if (!days.has(isoDay(d))) d.setDate(d.getDate() - 1);
+  let n = 0; while (days.has(isoDay(d))) { n++; d.setDate(d.getDate() - 1); }
+  return n;
+}
+
+/* THE DAILY RITUAL - the addictive core loop. Three rings to close each day:
+   Check in (morning mood), Moves (the goals due today), Reflect (evening look
+   back). A fully closed day is the streak that compounds. Gentle by design:
+   a day with no goals still closes on check-in + reflect. */
+export function dayProgress() {
+  const t = todayStr();
+  const checkedIn = !!getTodayCheckin();
+  const active = state.goals.filter(g => g.status === 'active');
+  const doneToday = active.filter(g => g.lastDoneAt && g.lastDoneAt.slice(0, 10) === t).length;
+  const dueToday = active.filter(isGoalDueToday).length;
+  const movesPlanned = doneToday + dueToday;
+  const reflected = !!getTodayReflection();
+  const movesValue = movesPlanned ? Math.min(1, doneToday / movesPlanned) : (checkedIn ? 1 : 0);
+  const rings = [
+    { key: 'checkin', label: 'Check in', done: checkedIn, value: checkedIn ? 1 : 0 },
+    { key: 'moves', label: 'Moves', done: movesPlanned ? doneToday >= movesPlanned : checkedIn, value: movesValue, sub: movesPlanned ? `${doneToday}/${movesPlanned}` : '' },
+    { key: 'reflect', label: 'Reflect', done: reflected, value: reflected ? 1 : 0 },
+  ];
+  const complete = rings.every(r => r.done);
+  const pct = Math.round((rings.reduce((a, r) => a + r.value, 0) / rings.length) * 100);
+  return { checkedIn, doneToday, movesPlanned, dueToday, reflected, rings, complete, pct };
+}
+
+// The ritual streak: consecutive days that were fully closed (checked in AND
+// reflected). This is the number that should feel precious - the "don't break it".
+export function ritualStreak() {
+  const ci = new Set(state.checkins.map(c => c.date));
+  const rf = new Set((state.reflections || []).map(r => r.date));
+  const closed = (ds) => ci.has(ds) && rf.has(ds);
+  const d = new Date();
+  if (!closed(isoDay(d))) d.setDate(d.getDate() - 1); // today still in progress does not break it
+  let n = 0; while (closed(isoDay(d))) { n++; d.setDate(d.getDate() - 1); }
+  return n;
+}
+
+// Variable reward: a surprise spark on a closed day, but only sometimes. Pass
+// force=true to guarantee one (e.g. the very first fully-closed day).
+export function maybeSpark(force = false) {
+  if (!force && Math.random() > 0.4) return null;
+  return SPARKS[Math.floor(Math.random() * SPARKS.length)];
+}
+
 /* ---------------- FEATURE ENGINE ---------------- */
 export const getCreations = () => state.creations || [];
 export const getCreation = (id) => (state.creations || []).find(c => c.id === id);
@@ -365,6 +599,10 @@ export function buildProfileText() {
     if (p.summary) lines.push(`Who they are: ${p.summary}`);
     if (p.tone && TONES[p.tone]) lines.push(`They respond best to a ${TONES[p.tone].name} coaching tone (${TONES[p.tone].line}).`);
     if (Array.isArray(p.domains) && p.domains.length) lines.push('What matters to them: ' + p.domains.map(d => d.name).join(', ') + '.');
+    if (p.faith && p.faith.opted && p.faith.tradition && !['secular', 'private'].includes(p.faith.tradition)) {
+      const fl = (FAITH_TRADITIONS.find(t => t.id === p.faith.tradition) || {}).label || p.faith.tradition;
+      lines.push(`Faith and values: ${fl}. Honor this gently when it fits, never preach, never assume.`);
+    }
   }
   const active = state.goals.filter(g => g.status === 'active');
   if (active.length) lines.push('Current goals: ' + active.slice(0, 8).map(g => `${g.title}${g.streak ? ` (${g.streak} day streak)` : ''}`).join('; ') + '.');
@@ -418,6 +656,8 @@ export function loadDemo() {
       tone: 'coach',
       toneWhy: 'You move on structure and momentum, so I will keep the next rep in front of you.',
       belief: 'Anyone who keeps a 6 day walking streak through a week like yours is not stuck. You are already moving.',
+      faith: { tradition: 'christian', importance: 'It steadies me', opted: true, setAt: d(21) },
+      customDomains: [],
       createdAt: d(21),
       answers: [],
     },
@@ -434,6 +674,12 @@ export function loadDemo() {
       { id: 'c4', date: day(3), mood: 4, note: 'Wrote 300 words, felt great.' },
       { id: 'c5', date: day(2), mood: 4, note: 'Trail day.' },
       { id: 'c6', date: day(1), mood: 3, note: 'Tired but steady.' },
+    ],
+    reflections: [
+      { id: 'rf1', date: day(4), rating: 4, gratitude: 'The walk cleared my head.', note: 'Kept the promise even when I did not feel it.', at: d(4) },
+      { id: 'rf2', date: day(3), rating: 4, gratitude: 'The writing flowed.', note: '', at: d(3) },
+      { id: 'rf3', date: day(2), rating: 4, gratitude: 'Trail and quiet.', note: 'Left my phone in the car.', at: d(2) },
+      { id: 'rf4', date: day(1), rating: 3, gratitude: 'Small steady day.', note: '', at: d(1) },
     ],
     journal: [
       { id: 'j1', at: d(6), text: 'Almost skipped the walk. Went anyway. That felt like the whole point.', source: 'user' },

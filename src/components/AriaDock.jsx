@@ -15,6 +15,7 @@ import {
   getProfile, getGoals, getCheckins, getJournal, getPeople, getWins, getRecs,
   getMessages, saveMessages, getTodayCheckin, getSettings, saveSettings,
   addGoal, addWin, addPerson, addJournal, addRec, addCheckin,
+  markGoalDone, addReflection, getFaith, getTodayReflection, ritualStreak,
 } from '../lib/store.js';
 
 const GREETING = {
@@ -52,8 +53,8 @@ const CAPS = [
 ];
 
 const actionIcon = (k) => ({
-  set_goal: 'target', log_win: 'trophy', add_person: 'users', add_journal: 'book',
-  add_rec: 'sparkles', draft_message: 'send', check_in: 'smile', navigate: 'chevronRight',
+  set_goal: 'target', mark_goal_done: 'check', log_win: 'trophy', add_person: 'users', add_journal: 'book',
+  add_rec: 'sparkles', draft_message: 'send', check_in: 'smile', reflect: 'moon', navigate: 'chevronRight',
 }[k] || 'chevronRight');
 
 /* Complete live snapshot of their life for grounding. Aria is blind to
@@ -61,14 +62,15 @@ const actionIcon = (k) => ({
 function buildSnapshot(path) {
   const p = getProfile();
   return {
-    profile: p ? { name: p.name, summary: p.summary, tone: p.tone, toneWhy: p.toneWhy, belief: p.belief, domains: p.domains } : null,
+    profile: p ? { name: p.name, summary: p.summary, tone: p.tone, toneWhy: p.toneWhy, belief: p.belief, domains: p.domains, faith: p.faith || null } : null,
     goals: getGoals().map(g => ({ title: g.title, domainId: g.domainId, cadence: g.cadence, streak: g.streak, lastDoneAt: g.lastDoneAt, status: g.status })),
     checkins: [...getCheckins()].sort((a, b) => a.date < b.date ? 1 : -1).slice(0, 10),
     journal: [...getJournal()].reverse().slice(0, 8).map(j => ({ at: j.at, text: j.text })),
     people: getPeople().map(pe => ({ name: pe.name, relation: pe.relation, intent: pe.intent, lastTouch: pe.lastTouch })),
     wins: [...getWins()].reverse().slice(0, 10).map(w => ({ at: w.at, title: w.title })),
     recs: getRecs().filter(r => !r.done).map(r => ({ kind: r.kind, title: r.title })),
-    today: { date: new Date().toISOString().slice(0, 10), mood: getTodayCheckin()?.mood ?? null },
+    today: { date: new Date().toISOString().slice(0, 10), mood: getTodayCheckin()?.mood ?? null, reflected: getTodayReflection()?.rating ?? null },
+    ritualStreak: ritualStreak(),
     path,
   };
 }
@@ -220,8 +222,23 @@ export default function AriaDock() {
         if (r.error) return push(r.message);
         return push(`Added to For you: "${r.rec.title}".`, { nav: { label: 'Open For you', to: '/foryou' } });
       }
+      if (a.kind === 'mark_goal_done' && a.goalTitle) {
+        const g = getGoals().find(x => x.status === 'active' && x.title.toLowerCase() === a.goalTitle.toLowerCase())
+          || getGoals().find(x => x.status === 'active' && x.title.toLowerCase().includes(a.goalTitle.toLowerCase()));
+        if (!g) return push(`I could not find "${a.goalTitle}" in your goals. Want me to set it up?`);
+        const r = markGoalDone(g.id);
+        if (r.error) return push(r.message);
+        celebrate({ count: r.milestone ? 150 : 80, x: window.innerWidth - 90, y: window.innerHeight - 120 });
+        return push(r.milestone ? `${r.milestone} in a row on "${g.title}". That is a milestone.` : `Logged "${g.title}". Streak is ${r.goal.streak} now.`, { nav: { label: 'See your paths', to: '/paths' } });
+      }
       if (a.kind === 'check_in') {
         return go('/today');
+      }
+      if (a.kind === 'reflect') {
+        const r = addReflection({ rating: a.reflection?.rating || 3, gratitude: a.reflection?.gratitude || '' });
+        if (r.error) return push(r.message);
+        celebrate({ count: 90, x: window.innerWidth - 90, y: window.innerHeight - 120 });
+        return push('Day closed with you. That is how it compounds.', { nav: { label: 'Back to Today', to: '/today' } });
       }
       if (a.kind === 'draft_message' && a.message) {
         return push('Here is a draft. Make it yours before you send it:', { draft: a.message });

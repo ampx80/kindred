@@ -1,14 +1,20 @@
-// Today - the heart of the app. Aria's daily message grounded in their real
-// data, the 1-3 moves that matter, a mood check-in, and their own words back.
-// A make-it-better pass: earned-momentum strip, tactile mood tiles, satisfying
-// move completions, a typed morning greeting from Aria. Fully reduced-motion
-// aware. Every original feature, handler, and button preserved.
-import { useState, useMemo, useEffect, useRef } from 'react';
+// Today - the heart of the app and the daily ritual. Aria's grounded message,
+// then the Day Ring: three rings to close each day (check in, move, reflect).
+// Morning beat = mood check-in; evening beat = an honest look back. Closing all
+// three grows the ritual streak - the number that compounds - and sometimes
+// earns a surprise spark. Faith folks get a warm, optional daily reflection.
+// Fully reduced-motion aware; every original feature preserved.
+import { useState, useMemo, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Card, Badge, useToast, longDate, Typer } from '../components/UI.jsx';
+import { Card, Badge, useToast, longDate, Typer, Input } from '../components/UI.jsx';
 import { Icon } from '../components/icons.jsx';
 import { celebrate } from '../lib/celebrate.js';
-import { useStore, getTodayCheckin, todaysMoves, addCheckin, markGoalDone, throwback, getRecs, peopleNeedingTouch, moodTrend, domainMeta } from '../lib/store.js';
+import DayRing, { DayRingLegend } from '../components/DayRing.jsx';
+import {
+  useStore, getTodayCheckin, todaysMoves, addCheckin, markGoalDone, throwback, getRecs,
+  peopleNeedingTouch, moodTrend, domainMeta, dayProgress, ritualStreak, getTodayReflection,
+  addReflection, faithReflection, maybeSpark,
+} from '../lib/store.js';
 import { dailyMessage } from '../lib/daily.js';
 import { speak, speechAvailable } from '../lib/voice.js';
 
@@ -19,23 +25,17 @@ const MOODS = [
   { v: 4, e: '🌤️', label: 'Good' },
   { v: 5, e: '☀️', label: 'Great' },
 ];
+const DAY_RATINGS = [
+  { v: 1, e: '😔', label: 'Rough' },
+  { v: 2, e: '😕', label: 'Meh' },
+  { v: 3, e: '🙂', label: 'Fine' },
+  { v: 4, e: '😄', label: 'Good' },
+  { v: 5, e: '🌟', label: 'Great' },
+];
 
 const iso = (d) => d.toISOString().slice(0, 10);
 const reduced = () => typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-// Consecutive days with a check-in, counting up from today (or yesterday, so the
-// streak does not read as broken before someone checks in this morning).
-function checkinStreak(checkins) {
-  const days = new Set(checkins.map(c => c.date));
-  const d = new Date();
-  if (!days.has(iso(d))) d.setDate(d.getDate() - 1);
-  let n = 0;
-  while (days.has(iso(d))) { n++; d.setDate(d.getDate() - 1); }
-  return n;
-}
-
-// A number that eases up to its value once on mount. Earned momentum should feel
-// like it is being counted out to you. Instant under reduced motion.
 function CountUp({ to = 0, dur = 700, className, style }) {
   const [n, setN] = useState(() => (reduced() ? to : 0));
   useEffect(() => {
@@ -56,43 +56,44 @@ export default function Today() {
   const profile = useStore(s => s.profile);
   const goals = useStore(s => s.goals);
   const checkins = useStore(s => s.checkins);
+  const reflections = useStore(s => s.reflections);
   useStore(s => s.people); useStore(s => s.recs);
   const toast = useToast();
   const nav = useNavigate();
   const [note, setNote] = useState('');
   const [noteOpen, setNoteOpen] = useState(false);
-  const [completing, setCompleting] = useState({}); // goal id -> true while its finish animation plays
+  const [completing, setCompleting] = useState({});
+  const [spark, setSpark] = useState(null);
 
   const today = getTodayCheckin();
+  const reflection = getTodayReflection();
+  const dp = dayProgress();
   const moves = todaysMoves();
   const msg = dailyMessage();
+  const faith = faithReflection();
   const tb = throwback();
   const openRecs = getRecs().filter(r => !r.done);
-  // Anti-dependency: gently push toward a real person, not more time with Aria.
-  // Not every day (rotates), and it leans on someone who actually matters to them.
   const reachPerson = peopleNeedingTouch()[0];
   const showReconnect = reachPerson && (new Date().getDate() % 2 === 0 || (today && today.mood <= 2));
 
   const todayISO = iso(new Date());
   const goalById = useMemo(() => Object.fromEntries((goals || []).map(g => [g.id, g])), [goals]);
+  const rStreak = ritualStreak();
 
-  // Earned-momentum snapshot, all honest and drawn from real data.
+  const hour = new Date().getHours();
+  const daypart = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
+
+  // The evening beat surfaces once the day is underway: afternoon onward, or as
+  // soon as they have checked in and cleared their moves. Never nags in the AM.
+  const showReflect = !reflection && (hour >= 15 || (dp.checkedIn && dp.dueToday === 0 && dp.doneToday > 0));
+
   const momentum = useMemo(() => {
     const active = (goals || []).filter(g => g.status === 'active');
     const bestLive = active.reduce((b, g) => ((g.streak || 0) > (b?.streak || 0) ? g : b), null);
-    const doneToday = active.filter(g => g.lastDoneAt && g.lastDoneAt.slice(0, 10) === todayISO).length;
-    const goalMovesLeft = moves.filter(m => m.kind === 'goal').length;
-    const planned = doneToday + goalMovesLeft;
     const mt = moodTrend(7);
-    const ciStreak = checkinStreak(checkins || []);
-    return { active, bestLive, doneToday, goalMovesLeft, planned, mt, ciStreak };
-  }, [goals, checkins, moves, todayISO]);
+    return { active, bestLive, mt };
+  }, [goals, checkins, reflections]);
 
-  const showMomentum = profile && (momentum.active.length > 0 || (checkins || []).length > 0);
-  const allClear = momentum.doneToday > 0 && momentum.goalMovesLeft === 0;
-
-  // Type Aria's message in the first time she is seen for the day this session,
-  // then hold it steady on later visits so it never nags.
   const [typeMsg] = useState(() => {
     try {
       const seen = sessionStorage.getItem('kd_today_typed');
@@ -104,21 +105,40 @@ export default function Today() {
   const [thinking, setThinking] = useState(typeMsg);
 
   const checkIn = (v) => {
+    const wasClosed = dp.complete;
     const r = addCheckin({ mood: v, note });
     if (r.error) return toast(r.message, 'warn');
     if (v >= 4) celebrate({ count: 50, y: window.innerHeight * .45 });
     toast(v <= 2 ? 'Noted. Gentle day, small steps.' : 'Logged. Good to know where you are.');
     setNoteOpen(v <= 3 && !note);
+    afterBeat(wasClosed);
   };
 
-  // Goal moves complete with a satisfying beat: the row fills green and settles,
-  // confetti bursts from the button, then the store update retires it. Non-goal
-  // moves navigate as before.
+  // If a beat just closed the whole day, celebrate it hard and maybe drop a spark.
+  const afterBeat = (wasClosed) => {
+    const now = dayProgress();
+    if (now.complete && !wasClosed) {
+      const firstEver = (reflections || []).length <= 1 || ritualStreak() <= 1;
+      if (!reduced()) celebrate({ count: 200, y: window.innerHeight * .4 });
+      const s = maybeSpark(firstEver);
+      if (s) setSpark(s);
+    }
+  };
+
+  const submitReflection = (rating, gratitude) => {
+    const wasClosed = dp.complete;
+    const r = addReflection({ rating, gratitude });
+    if (r.error) return toast(r.message, 'warn');
+    toast('Day closed. That is how it compounds.');
+    afterBeat(wasClosed);
+  };
+
   const doGoal = (m, ev) => {
     if (completing[m.id]) return;
     const rect = ev?.currentTarget?.getBoundingClientRect?.();
     const origin = rect ? { x: rect.left + rect.width / 2, y: rect.top } : { y: window.innerHeight * .5 };
     setCompleting(c => ({ ...c, [m.id]: true }));
+    const wasClosed = dp.complete;
     const run = () => {
       const r = markGoalDone(m.id);
       setCompleting(c => { const n = { ...c }; delete n[m.id]; return n; });
@@ -126,6 +146,7 @@ export default function Today() {
       if (r.milestone) { celebrate({ count: 170, ...origin }); toast(`${r.milestone} in a row. That is a milestone.`); }
       else if (r.graceApplied) { celebrate({ count: 80, ...origin }); toast('You missed a day and I kept your streak. Everyone misses one. Back at it.'); }
       else { celebrate({ count: 80, ...origin }); toast('Counted. Momentum is yours.'); }
+      afterBeat(wasClosed);
     };
     if (reduced()) run(); else setTimeout(run, 520);
   };
@@ -134,11 +155,6 @@ export default function Today() {
     if (m.kind === 'goal') return doGoal(m, ev);
     nav(m.to);
   };
-
-  const hour = new Date().getHours();
-  const daypart = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
-
-  const progressPct = momentum.planned ? Math.round((momentum.doneToday / momentum.planned) * 100) : 0;
 
   return (
     <div className="col gap-3">
@@ -161,58 +177,60 @@ export default function Today() {
                 )}
               </div>
               <p className="serif" style={{ fontSize: '1.14rem', lineHeight: 1.6, margin: 0 }}>
-                {typeMsg
-                  ? <Typer text={msg} speed={16} onDone={() => setThinking(false)} />
-                  : msg}
+                {typeMsg ? <Typer text={msg} speed={16} onDone={() => setThinking(false)} /> : msg}
               </p>
             </div>
           </div>
         </Card>
       )}
 
-      {showMomentum && (
-        <div className="td-tiles stagger">
-          <div className="td-tile" title="Your strongest live streak">
-            <span className="td-tile-ic" style={{ background: 'var(--accent-50)', color: 'var(--accent-600)' }}>
-              <Icon name="flame" size={22} className={momentum.bestLive?.streak ? 'td-flame' : ''} />
-            </span>
-            <div className="col" style={{ gap: '.05rem', minWidth: 0 }}>
-              <span className="td-num" style={{ color: 'var(--accent-700)' }}>
-                <CountUp to={momentum.bestLive?.streak || 0} /><span className="td-unit">{(momentum.bestLive?.streak || 0) === 1 ? ' day' : ' days'}</span>
-              </span>
-              <span className="muted t-sm clip">{momentum.bestLive?.streak ? `on ${momentum.bestLive.title}` : 'your first streak is one rep away'}</span>
+      {/* THE DAILY RITUAL - the addictive centerpiece */}
+      <Card className="card-pad td-ritual">
+        <div className="td-ritual-grid">
+          <DayRing progress={dp} size={172} />
+          <div className="col" style={{ gap: '.9rem', minWidth: 0, flex: 1 }}>
+            <div className="row between gap-2 wrap" style={{ alignItems: 'flex-start' }}>
+              <div className="col" style={{ gap: '.15rem', minWidth: 0 }}>
+                <h3 style={{ margin: 0 }}>{dp.complete ? 'Today is closed' : 'Close your day'}</h3>
+                <span className="muted t-sm">
+                  {dp.complete ? 'Check in, moves, reflection - all done. This is the whole thing.' : 'Three small beats. Finish them and the streak grows.'}
+                </span>
+              </div>
+              {rStreak > 0 && (
+                <span className="td-ritual-streak" title="Consecutive fully closed days">
+                  <Icon name="flame" size={16} /> <CountUp to={rStreak} /> day{rStreak === 1 ? '' : 's'}
+                </span>
+              )}
             </div>
-          </div>
-
-          <div className="td-tile" title="Moves completed today">
-            <span className="td-tile-ic" style={{ background: 'var(--sage-bg)', color: 'var(--sage)' }}>
-              <Icon name={allClear ? 'trophy' : 'check'} size={22} />
-            </span>
-            <div className="col" style={{ gap: '.05rem', minWidth: 0 }}>
-              <span className="td-num" style={{ color: 'var(--sage)' }}>
-                <CountUp to={momentum.doneToday} /><span className="td-unit">{momentum.planned ? ` of ${momentum.planned}` : ''}</span>
-              </span>
-              <span className="muted t-sm clip">{allClear ? 'all clear, nice work' : momentum.goalMovesLeft ? `${momentum.goalMovesLeft} still to go` : 'moves done today'}</span>
-            </div>
-          </div>
-
-          <div className="td-tile" title="How your week is feeling">
-            <span className="td-tile-ic" style={{ background: 'var(--gold-bg)', color: 'var(--gold)' }}>
-              <Icon name="smile" size={22} />
-            </span>
-            <div className="col" style={{ gap: '.05rem', minWidth: 0 }}>
-              <span className="td-num" style={{ color: 'var(--gold)' }}>
-                {momentum.mt ? <>{momentum.mt.avg}<span className="td-unit"> of 5</span></> : <span style={{ fontSize: '1.2rem' }}>Say hi</span>}
-              </span>
-              <span className="muted t-sm clip">
-                {momentum.mt
-                  ? `mood over ${momentum.mt.count} check-in${momentum.mt.count === 1 ? '' : 's'}`
-                  : 'tap a mood below to start'}
-                {momentum.ciStreak > 1 ? ` - ${momentum.ciStreak} day run` : ''}
-              </span>
-            </div>
+            <DayRingLegend progress={dp} />
           </div>
         </div>
+      </Card>
+
+      {spark && (
+        <Card className="card-pad td-spark" onClick={() => setSpark(null)} style={{ cursor: 'pointer' }}>
+          <div className="row gap-2" style={{ alignItems: 'flex-start' }}>
+            <span className="td-spark-ic" aria-hidden><Icon name="sparkles" size={22} /></span>
+            <div className="col" style={{ gap: '.15rem', minWidth: 0 }}>
+              <span className="t-xs fw-7" style={{ letterSpacing: '.07em', textTransform: 'uppercase', color: 'var(--gold)' }}>A little something from Aria</span>
+              <p className="serif" style={{ fontSize: '1.1rem', margin: 0, lineHeight: 1.5 }}>{spark}</p>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {faith && (
+        <Card className="card-pad card-hover" style={{ background: 'var(--sky-bg)', borderColor: 'var(--sky)' }}
+          onClick={() => window.dispatchEvent(new CustomEvent('kindred:aria', { detail: { prompt: `Sit with me on this for a moment: ${faith.text}` } }))}>
+          <div className="row gap-2" style={{ alignItems: 'flex-start' }}>
+            <Icon name="sun" size={22} style={{ color: 'var(--sky)', flexShrink: 0, marginTop: 3 }} />
+            <div className="col" style={{ gap: '.2rem', minWidth: 0 }}>
+              <span className="t-xs fw-7 muted" style={{ letterSpacing: '.07em', textTransform: 'uppercase' }}>A quiet moment</span>
+              <p className="serif" style={{ fontSize: '1.12rem', margin: 0, lineHeight: 1.55 }}>{faith.text}</p>
+              <span className="muted t-sm">Tap to sit with it together.</span>
+            </div>
+          </div>
+        </Card>
       )}
 
       {showReconnect && (
@@ -237,21 +255,12 @@ export default function Today() {
             <Badge tone="accent">{moves.length ? `${moves.length} that matter` : 'clear'}</Badge>
           </div>
 
-          {momentum.planned > 0 && (
-            <div className="col" style={{ gap: '.4rem', marginBottom: '1rem' }}>
-              <div className="warmbar" aria-hidden><i style={{ width: `${progressPct}%` }} /></div>
-              <span className="t-xs fw-6 muted">
-                {allClear ? 'Every move done. That is a full morning.' : `${momentum.doneToday} of ${momentum.planned} done today`}
-              </span>
-            </div>
-          )}
-
           {moves.length === 0 ? (
-            allClear ? (
+            dp.doneToday > 0 ? (
               <div className="row gap-2" style={{ alignItems: 'center', padding: '.4rem 0' }}>
                 <span className="row center floaty" style={{ width: 46, height: 46, borderRadius: 14, background: 'var(--gold-bg)', color: 'var(--gold)', flex: 'none' }}><Icon name="trophy" size={24} /></span>
                 <div className="col" style={{ gap: '.15rem' }}>
-                  <span className="fw-6">You cleared it. All {momentum.doneToday} done.</span>
+                  <span className="fw-6">You cleared it. All {dp.doneToday} done.</span>
                   <span className="muted t-sm">Rest, or open <Link className="link" to="/paths">your paths</Link> and get ahead.</span>
                 </div>
               </div>
@@ -292,6 +301,7 @@ export default function Today() {
           )}
         </Card>
 
+        {/* MORNING BEAT: mood check-in. Once reflected-ready, the evening beat takes over below. */}
         <Card className="card-pad">
           <h3 style={{ marginBottom: '.35rem' }}>How is today sitting?</h3>
           <p className="muted t-sm" style={{ marginBottom: '.9rem' }}>{today ? 'You can change it anytime today.' : 'One tap. Aria reads the weather.'}</p>
@@ -326,6 +336,20 @@ export default function Today() {
         </Card>
       </div>
 
+      {/* EVENING BEAT: close the day with an honest look back. */}
+      {showReflect && <ReflectionCard onSubmit={submitReflection} />}
+      {reflection && (
+        <Card className="card-pad" style={{ background: 'var(--gold-bg)', borderColor: 'var(--gold)' }}>
+          <div className="row gap-2" style={{ alignItems: 'center' }}>
+            <Icon name="moon" size={20} style={{ color: 'var(--gold)', flexShrink: 0 }} />
+            <div className="col" style={{ gap: '.1rem', minWidth: 0 }}>
+              <span className="fw-6">Day closed. You rated it {DAY_RATINGS.find(x => x.v === reflection.rating)?.label.toLowerCase()}.</span>
+              {reflection.gratitude && <span className="muted t-sm clip">Grateful for: {reflection.gratitude}</span>}
+            </div>
+          </div>
+        </Card>
+      )}
+
       <div className="grid" style={{ gridTemplateColumns: openRecs.length ? '1fr 1fr' : '1fr' }}>
         {tb && (
           <Card className="card-pad card-hover" style={{ background: 'var(--gold-bg)' }}>
@@ -355,22 +379,61 @@ export default function Today() {
   );
 }
 
-// Scoped micro-interaction styles. Lives with the page (does not touch the shared
-// design system) and stays out of index.css. All motion is disabled under
-// prefers-reduced-motion.
+// The evening reflection: rate the day, name one thing you are grateful for.
+// Kept light on purpose - two taps closes it and grows the ritual streak.
+function ReflectionCard({ onSubmit }) {
+  const [rating, setRating] = useState(0);
+  const [gratitude, setGratitude] = useState('');
+  return (
+    <Card className="card-pad td-reflect">
+      <div className="row gap-2" style={{ alignItems: 'center', marginBottom: '.6rem' }}>
+        <span className="row center" style={{ width: 38, height: 38, borderRadius: 12, background: 'var(--gold-bg)', color: 'var(--gold)', flex: 'none' }}><Icon name="moon" size={20} /></span>
+        <div className="col" style={{ gap: '.1rem', minWidth: 0 }}>
+          <h3 style={{ margin: 0 }}>Close the day</h3>
+          <span className="muted t-sm">How did today actually go? Aria remembers it with you.</span>
+        </div>
+      </div>
+      <div className="row gap-1" style={{ justifyContent: 'space-between', marginBottom: '.8rem' }}>
+        {DAY_RATINGS.map(m => {
+          const sel = rating === m.v;
+          return (
+            <button key={m.v} onClick={() => setRating(m.v)} aria-pressed={sel} aria-label={m.label}
+              className={`col center td-mood${sel ? ' sel' : ''}`}
+              style={{
+                gap: '.25rem', flex: 1, padding: '.6rem .2rem', cursor: 'pointer', borderRadius: 'var(--r-md)',
+                border: sel ? '2px solid var(--gold)' : '1.5px solid var(--line)',
+                background: sel ? 'var(--gold-bg)' : 'var(--paper)',
+              }}>
+              <span className="td-emo" style={{ fontSize: '1.5rem', lineHeight: 1 }}>{m.e}</span>
+              <span className="t-xs fw-6 muted">{m.label}</span>
+            </button>
+          );
+        })}
+      </div>
+      <form className="col gap-2" onSubmit={(e) => { e.preventDefault(); if (rating) onSubmit(rating, gratitude); }}>
+        <Input placeholder="One thing you are grateful for today (optional)" value={gratitude} onChange={e => setGratitude(e.target.value)} />
+        <button className="btn btn-primary" type="submit" disabled={!rating} style={{ alignSelf: 'flex-start' }}>
+          <Icon name="check" size={16} /> Close the day
+        </button>
+      </form>
+    </Card>
+  );
+}
+
 function TodayStyles() {
   return (
     <style>{`
-      .td-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: .7rem; }
-      @media (max-width: 560px) { .td-tiles { grid-template-columns: 1fr; } }
-      .td-tile { display: flex; align-items: center; gap: .8rem; padding: .85rem 1rem; background: var(--paper);
-        border: 1px solid var(--line); border-radius: var(--r-md); box-shadow: var(--shadow-sm);
-        transition: transform .2s var(--ease), box-shadow .2s var(--ease), border-color .2s var(--ease); }
-      .td-tile:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); border-color: var(--accent-300); }
-      .td-tile-ic { width: 42px; height: 42px; border-radius: 13px; display: grid; place-items: center; flex: none; }
-      .td-num { font-family: var(--font-display); font-weight: 700; font-size: 1.75rem; line-height: 1;
-        letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
-      .td-unit { font-size: .95rem; font-weight: 600; color: var(--n-600); letter-spacing: 0; }
+      .td-ritual-grid { display: flex; align-items: center; gap: 1.6rem; }
+      @media (max-width: 560px) { .td-ritual-grid { flex-direction: column; text-align: center; } .td-ritual-grid .dayring-legend { width: 100%; max-width: 260px; margin: 0 auto; } .td-ritual-grid .row.between { justify-content: center; } }
+      .td-ritual-streak { display: inline-flex; align-items: center; gap: .3rem; font-weight: 800; font-size: .92rem; color: var(--accent-700);
+        background: var(--accent-50); border: 1px solid var(--accent-300); border-radius: 999px; padding: .32rem .7rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
+      .td-ritual-streak svg { animation: tdFlicker 2.6s ease-in-out infinite; transform-origin: center bottom; }
+
+      .td-spark { border-color: var(--gold); background: linear-gradient(135deg, var(--paper), var(--gold-bg)); animation: tdSparkIn .5s cubic-bezier(.22,1,.36,1); }
+      @keyframes tdSparkIn { from { opacity: 0; transform: translateY(10px) scale(.98); } to { opacity: 1; transform: none; } }
+      .td-spark-ic { width: 40px; height: 40px; border-radius: 13px; background: var(--gold-bg); color: var(--gold); display: grid; place-items: center; flex: none; animation: tdFlicker 2.4s ease-in-out infinite; }
+      .td-reflect { animation: tdSparkIn .45s cubic-bezier(.22,1,.36,1); }
+
       .td-flame { animation: tdFlicker 2.4s ease-in-out infinite; transform-origin: center bottom; }
       @keyframes tdFlicker { 0%,100% { transform: scale(1) rotate(-2deg); } 50% { transform: scale(1.1) rotate(2deg); } }
 
@@ -392,8 +455,8 @@ function TodayStyles() {
       .td-streak { animation: tdFlicker 2.8s ease-in-out infinite; }
 
       @media (prefers-reduced-motion: reduce) {
-        .td-tile, .td-tile:hover, .td-mood, .td-mood:hover, .td-mood:active { transition: none !important; transform: none !important; }
-        .td-flame, .td-mood.sel .td-emo, .td-mood:hover .td-emo, .td-move, .td-move.done, .td-check-pop, .td-streak { animation: none !important; transition: none !important; transform: none !important; }
+        .td-mood, .td-mood:hover, .td-mood:active, .td-flame, .td-mood.sel .td-emo, .td-mood:hover .td-emo,
+        .td-move, .td-move.done, .td-check-pop, .td-streak, .td-spark, .td-spark-ic, .td-reflect, .td-ritual-streak svg { animation: none !important; transition: none !important; transform: none !important; }
       }
     `}</style>
   );

@@ -6,14 +6,17 @@ import { Link } from 'react-router-dom';
 import { Card, Badge, Button, Modal, Field, Input, Select, useToast, SectionHeader } from '../components/UI.jsx';
 import { Icon } from '../components/icons.jsx';
 import { celebrate } from '../lib/celebrate.js';
-import { useStore, domainMeta, goalsForDomain, markGoalDone, addGoal, isGoalDueToday, DOMAIN_META } from '../lib/store.js';
+import { useStore, domainMeta, goalsForDomain, markGoalDone, addGoal, addCustomDomain, isGoalDueToday, DOMAIN_META } from '../lib/store.js';
+
+const NEW = '__new__';
+const EMOJI_PICKS = ['♟️', '📺', '🎸', '🎮', '🍳', '🪴', '🎨', '🧩', '🏃', '📷', '🎯', '🧘', '💰', '🐶', '✈️', '📖'];
 
 export default function Paths() {
   const profile = useStore(s => s.profile);
   useStore(s => s.goals);
   const toast = useToast();
   const [addOpen, setAddOpen] = useState(false);
-  const [form, setForm] = useState({ title: '', domainId: '', why: '', cadence: 'daily' });
+  const [form, setForm] = useState({ title: '', domainId: '', why: '', cadence: 'daily', newName: '', newEmoji: '✨' });
 
   const domains = profile?.domains || [];
 
@@ -24,13 +27,22 @@ export default function Paths() {
     else { celebrate({ count: 55, y: window.innerHeight * .5 }); toast('Counted.'); }
   };
 
+  const creatingNew = form.domainId === NEW;
+
   const submit = () => {
-    const r = addGoal(form);
+    let domainId = form.domainId;
+    if (creatingNew) {
+      if (!form.newName.trim()) return toast('Name the new area first.', 'warn');
+      const dr = addCustomDomain({ name: form.newName, emoji: form.newEmoji || '✨', why: form.why });
+      if (dr.error) return toast(dr.message, 'warn');
+      domainId = dr.domain.id;
+    }
+    const r = addGoal({ title: form.title, domainId, why: form.why, cadence: form.cadence });
     if (r.error) return toast(r.message, 'warn');
     celebrate({ count: 70 });
     toast(`New goal on the board: ${r.goal.title}`);
     setAddOpen(false);
-    setForm({ title: '', domainId: '', why: '', cadence: 'daily' });
+    setForm({ title: '', domainId: '', why: '', cadence: 'daily', newName: '', newEmoji: '✨' });
   };
 
   return (
@@ -84,20 +96,39 @@ export default function Paths() {
       <Modal open={addOpen} onClose={() => setAddOpen(false)} title="A new goal"
         footer={<>
           <Button variant="ghost" onClick={() => setAddOpen(false)}>Not now</Button>
-          <Button onClick={submit} disabled={!form.title.trim() || !form.domainId}>Add it</Button>
+          <Button onClick={submit} disabled={!form.title.trim() || !form.domainId || (creatingNew && !form.newName.trim())}>Add it</Button>
         </>}>
         <div className="col gap-2">
           <Field label="The goal" hint="Small enough to do this week. Small keeps promises.">
             <Input autoFocus placeholder="Walk 20 minutes before work" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
           </Field>
-          <Field label="Which path is it part of?">
+          <Field label="Which path is it part of?" hint="Do not see it? Make a new area for anything - chess, more TV, the gym, a language.">
             <Select value={form.domainId} onChange={e => setForm(f => ({ ...f, domainId: e.target.value }))}>
               {domains.map(d => <option key={d.id} value={d.id}>{domainMeta(d.id).emoji} {d.name}</option>)}
               {Object.keys(DOMAIN_META).filter(k => !domains.some(d => d.id === k)).map(k => (
                 <option key={k} value={k}>{DOMAIN_META[k].emoji} {k}</option>
               ))}
+              <option value={NEW}>+ Create a new area of life</option>
             </Select>
           </Field>
+          {creatingNew && (
+            <div className="panel col gap-2" style={{ padding: '.9rem 1rem' }}>
+              <Field label="Name your new area" hint="Anything that matters to you. Aria will build it out with you.">
+                <Input placeholder="Chess, Watching more TV, Guitar, The gym" value={form.newName} onChange={e => setForm(f => ({ ...f, newName: e.target.value }))} />
+              </Field>
+              <Field label="Pick an emoji for it">
+                <div className="row wrap gap-1">
+                  {EMOJI_PICKS.map(em => (
+                    <button key={em} type="button" onClick={() => setForm(f => ({ ...f, newEmoji: em }))}
+                      className="row center" aria-pressed={form.newEmoji === em}
+                      style={{ width: 40, height: 40, borderRadius: 12, fontSize: '1.25rem', cursor: 'pointer',
+                        border: form.newEmoji === em ? '2px solid var(--accent)' : '1.5px solid var(--line)',
+                        background: form.newEmoji === em ? 'var(--accent-50)' : 'var(--paper)' }}>{em}</button>
+                  ))}
+                </div>
+              </Field>
+            </div>
+          )}
           <Field label="How often?">
             <Select value={form.cadence} onChange={e => setForm(f => ({ ...f, cadence: e.target.value }))}>
               <option value="daily">Daily</option>

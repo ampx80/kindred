@@ -300,14 +300,22 @@ function Glimpse() {
 
 const STEPS = [
   { icon: 'sparkles', t: 'Meet Aria', d: 'One warm conversation. No forms, no homework. She simply listens.' },
-  { icon: 'compass', t: 'Map your life', d: 'Faith, body, people, work, the book you keep meaning to write. All held in one place.' },
-  { icon: 'sun', t: 'Daily guidance', d: 'Every morning, the next small, kept promise. Nothing overwhelming, ever.' },
+  { icon: 'compass', t: 'Map any life', d: 'Faith, the gym, your people, the book, even watching more TV to actually rest. Nothing is too small or too weird.' },
+  { icon: 'sun', t: 'Close your day', d: 'Check in, do the one move that matters, reflect at night. Three small beats, a streak that compounds.' },
   { icon: 'trophy', t: 'Watch it grow', d: 'Streaks, wins, and patterns Aria remembers so your life compounds over time.' },
+];
+
+// The breadth of it: whatever you actually care about gets a home and a streak.
+const ANY_GOALS = [
+  '🏋️ Weightlifting', '🕊️ Deeper faith', '📞 Call mom weekly', '♟️ Learn chess',
+  '📺 More rest, guilt-free', '🏃 Move every day', '🎸 Pick up guitar', '📖 Read the book',
+  '🧘 Ten quiet minutes', '💧 Actually drink water', '🌱 Sobriety, day by day', '✍️ Write again',
+  '🤝 Mend a friendship', '🪴 Keep a garden alive', '🗣️ Learn a language', '😴 A real bedtime',
 ];
 
 const TRUST = [
   { icon: 'leaf', t: 'Private by design', d: 'Everything you share stays in your space. No ads, no selling you.' },
-  { icon: 'mic', t: 'One honest talk', d: 'No sign-up wall, no forms. Just a few real questions to start.' },
+  { icon: 'sun', t: 'Faith, your way', d: 'Christian, Muslim, Jewish, seeking, or none. Aria honors it gently, never assumes, never preaches.' },
   { icon: 'sparkles', t: 'She remembers', d: 'Every promise, every win, every name. Your life compounds.' },
   { icon: 'refresh', t: 'Yours to keep or clear', d: 'Export it or delete all of it in one tap, anytime.' },
 ];
@@ -367,6 +375,76 @@ function Constellation() {
   );
 }
 
+// A static three-ring graphic in the same language as the in-app Day Ring, so
+// the marketing shows the exact ritual people will live in.
+function RitualRings() {
+  const size = 200, cx = size / 2, cy = size / 2, width = 15, gap = 21;
+  const radii = [cx - width / 2 - 2, cx - width / 2 - 2 - gap, cx - width / 2 - 2 - gap * 2];
+  const vals = [1, 1, 0.66];
+  const cols = ['var(--accent-600)', 'var(--sage)', 'var(--gold)'];
+  const tracks = ['var(--accent-50)', 'var(--sage-bg)', 'var(--gold-bg)'];
+  return (
+    <div className="kl-rings">
+      <svg width={size} height={size}>
+        {radii.map((r, i) => {
+          const c = 2 * Math.PI * r;
+          return (
+            <g key={i}>
+              <circle cx={cx} cy={cy} r={r} fill="none" stroke={tracks[i]} strokeWidth={width} />
+              <circle cx={cx} cy={cy} r={r} fill="none" stroke={cols[i]} strokeWidth={width} strokeLinecap="round"
+                strokeDasharray={c} strokeDashoffset={c * (1 - vals[i])} transform={`rotate(-90 ${cx} ${cy})`} />
+            </g>
+          );
+        })}
+      </svg>
+      <div className="kl-rings-center">
+        <span className="kl-rings-pct">88<span>%</span></span>
+        <span className="kl-rings-lbl">of today</span>
+      </div>
+    </div>
+  );
+}
+
+const RITUAL_BEATS = [
+  { emoji: '🌅', t: 'Check in', d: 'One tap in the morning. Aria reads the weather of your day.' },
+  { emoji: '✅', t: 'Move', d: 'The one small promise that matters today. Done in a rep, not an hour.' },
+  { emoji: '🌙', t: 'Reflect', d: 'A quick, honest look back at night. That is what makes it stick.' },
+];
+
+function RitualShowcase() {
+  return (
+    <div className="kl-ritual reveal">
+      <div className="kl-ritual-visual">
+        <RitualRings />
+        <span className="kl-ritual-streak"><Icon name="flame" size={16} /> 23 day streak</span>
+      </div>
+      <div className="kl-ritual-beats">
+        {RITUAL_BEATS.map((b, i) => (
+          <div key={b.t} className="kl-beat" style={{ transitionDelay: `${i * 0.08}s` }}>
+            <span className="kl-beat-e">{b.emoji}</span>
+            <div>
+              <div className="kl-beat-t serif">{b.t}</div>
+              <p className="kl-beat-d">{b.d}</p>
+            </div>
+          </div>
+        ))}
+        <p className="kl-ritual-note">Close all three and your streak grows. Miss one? Aria keeps it for you. Warm, never punishing.</p>
+      </div>
+    </div>
+  );
+}
+
+function AnyGoalBand() {
+  const row = [...ANY_GOALS, ...ANY_GOALS];
+  return (
+    <div className="kl-marquee reveal" aria-hidden={false}>
+      <div className="kl-marquee-track">
+        {row.map((g, i) => <span key={i} className="kl-goal-chip">{g}</span>)}
+      </div>
+    </div>
+  );
+}
+
 export default function Landing() {
   const nav = useNavigate();
   const root = useReveal();
@@ -418,9 +496,10 @@ export default function Landing() {
           </h1>
 
           <p className="k-hero__lead reveal">
-            Kindred learns who you are in one warm conversation, then walks with you:
-            your faith, your body, your people, your work, the book you keep not writing.
-            Every day, it remembers. Every day, it helps.
+            Kindred learns who you are in one warm conversation, then shows up every
+            single day. Weightlifting or your faith, calling your brother or finally
+            learning chess - it dissects what YOU actually want and turns it into one
+            small kept promise a day. And it remembers every one.
           </p>
 
           <div className="k-cta-row reveal reveal-d1">
@@ -459,6 +538,30 @@ export default function Landing() {
             </span>
           </div>
         </div>
+      </section>
+
+      {/* ---------------- THE DAILY RITUAL ---------------- */}
+      <section className="k-section" style={{ paddingTop: '2.6rem' }}>
+        <div className="k-wrap">
+          <div className="k-section__head reveal">
+            <span className="k-section__eyebrow">The reason you come back</span>
+            <h2 className="k-section__title">A daily ritual you will not want to break</h2>
+            <p className="k-section__sub">Three small beats close your day. A streak that compounds, a check-in that Aria reads, and the occasional surprise. Gentle enough to keep, satisfying enough to crave.</p>
+          </div>
+          <RitualShowcase />
+        </div>
+      </section>
+
+      {/* ---------------- ANY GOAL ---------------- */}
+      <section className="k-section" style={{ paddingTop: '1rem' }}>
+        <div className="k-wrap">
+          <div className="k-section__head reveal">
+            <span className="k-section__eyebrow">Whatever you actually want</span>
+            <h2 className="k-section__title">Weightlifting or watching more TV. Scripture or chess.</h2>
+            <p className="k-section__sub">Most apps decide what you should track. Kindred asks. Any goal you name gets its own home, its own streak, and Aria in your corner - no matter how big, small, or wonderfully specific.</p>
+          </div>
+        </div>
+        <AnyGoalBand />
       </section>
 
       {/* ---------------- HOW IT WORKS ---------------- */}
@@ -595,6 +698,36 @@ function LandingStyles() {
     <style>{`
 .kl-demo-sec { padding-top: 3.4rem; }
 
+/* --- Daily ritual showcase --- */
+.kl-ritual { display: grid; grid-template-columns: auto 1fr; gap: 2.4rem; align-items: center; max-width: 860px; margin: 0 auto;
+  background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-xl); box-shadow: var(--shadow-lg); padding: 2rem 2.2rem; }
+.kl-ritual-visual { display: flex; flex-direction: column; align-items: center; gap: 1rem; }
+.kl-rings { position: relative; width: 200px; height: 200px; display: grid; place-items: center; }
+.kl-rings > * { grid-area: 1 / 1; }
+.kl-rings-center { display: flex; flex-direction: column; align-items: center; }
+.kl-rings-pct { font-family: var(--font-display); font-weight: 800; font-size: 2.7rem; line-height: 1; letter-spacing: -.03em; color: var(--ink); }
+.kl-rings-pct span { font-size: 1.2rem; color: var(--n-500); }
+.kl-rings-lbl { font-size: .8rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--n-500); margin-top: .3rem; }
+.kl-ritual-streak { display: inline-flex; align-items: center; gap: .35rem; font-weight: 800; font-size: .95rem; color: var(--accent-700);
+  background: var(--accent-50); border: 1px solid var(--accent-300); border-radius: 999px; padding: .4rem .85rem; }
+.kl-ritual-streak svg { color: var(--accent-600); }
+.kl-ritual-beats { display: flex; flex-direction: column; gap: 1rem; }
+.kl-beat { display: flex; gap: .9rem; align-items: flex-start; }
+.kl-beat-e { font-size: 1.7rem; line-height: 1; flex: none; width: 44px; height: 44px; display: grid; place-items: center; background: var(--n-25); border-radius: 13px; }
+.kl-beat-t { font-size: 1.15rem; font-weight: 600; }
+.kl-beat-d { font-size: .96rem; line-height: 1.5; color: var(--n-700); margin-top: .1rem; }
+.kl-ritual-note { font-size: .95rem; color: var(--n-600); font-style: italic; border-top: 1px dashed var(--line-strong); padding-top: .9rem; margin-top: .2rem; }
+@media (max-width: 680px) { .kl-ritual { grid-template-columns: 1fr; gap: 1.6rem; padding: 1.6rem; text-align: left; } .kl-ritual-visual { margin: 0 auto; } }
+
+/* --- Any goal marquee --- */
+.kl-marquee { margin-top: 1.6rem; overflow: hidden; -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); }
+.kl-marquee-track { display: inline-flex; gap: .7rem; padding: .3rem 0; white-space: nowrap; animation: klMarquee 42s linear infinite; }
+.kl-marquee:hover .kl-marquee-track { animation-play-state: paused; }
+@keyframes klMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.kl-goal-chip { flex: none; font-size: 1.02rem; font-weight: 600; color: var(--ink); background: var(--paper); border: 1px solid var(--line-strong);
+  border-radius: 999px; padding: .7rem 1.15rem; box-shadow: var(--shadow-sm); }
+
 /* --- Aria demo card --- */
 .kl-demo {
   max-width: 560px; margin: 0 auto; background: var(--paper);
@@ -694,10 +827,11 @@ function LandingStyles() {
 .kl-sticky .btn { box-shadow: var(--accent-glow), var(--shadow-lg); padding: .82rem 1.4rem; }
 
 @media (prefers-reduced-motion: reduce) {
-  .kl-bubble, .kl-choice, .kl-mapped, .kl-glimpse-t { animation: none !important; }
+  .kl-bubble, .kl-choice, .kl-mapped, .kl-glimpse-t, .kl-marquee-track { animation: none !important; }
   .kl-thread { scroll-behavior: auto; }
   .kl-dom { transition: none; }
   .kl-sticky { transition: opacity .2s linear; }
+  .kl-marquee-track { flex-wrap: wrap; white-space: normal; justify-content: center; }
 }
     `}</style>
   );
