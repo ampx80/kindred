@@ -10,6 +10,7 @@ import { celebrate } from '../lib/celebrate.js';
 import { completeProfile, domainMeta, TONES } from '../lib/store.js';
 import { localNextQuestion } from '../lib/interview-local.js';
 import { screenForCrisis, crisisReply, CRISIS_RESOURCES } from '../lib/safety.js';
+import { speak, stopSpeaking, speechAvailable } from '../lib/voice.js';
 import CrisisCard from '../components/CrisisCard.jsx';
 
 const GREET = "Hi, I'm Aria. I'm an AI companion, not a person - but I'm a good listener, and I'm really looking forward to getting to know you. No forms, no homework, just a few questions, and we'll find what actually matters to you.";
@@ -73,8 +74,15 @@ export default function Welcome() {
   const [sensed, setSensed] = useState([]);          // life-areas Aria has heard so far
   const [weaveIdx, setWeaveIdx] = useState(0);       // cycles the weaving reflections
   const [listening, setListening] = useState(false);
+  const [voiceOn, setVoiceOn] = useState(true);      // Aria speaks aloud during onboarding
   const recogRef = useRef(null);
   const inputRef = useRef(null);
+
+  // Aria's living voice: she speaks each line as it types, so it feels like she
+  // is talking to you, not printing at you. Best-effort (browser autoplay may
+  // gate the very first line until a tap; every line after the intro is fine).
+  const say = (t) => { if (voiceOn && speechAvailable() && t) speak(String(t).replace(/\s+/g, ' ').trim()); };
+  const toggleVoice = () => setVoiceOn(v => { const nx = !v; if (!nx) stopSpeaking(); return nx; });
 
   const speechOK = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
   const toggleMic = () => {
@@ -91,7 +99,14 @@ export default function Welcome() {
       recogRef.current = rec; setListening(true); rec.start();
     } catch { setListening(false); }
   };
-  useEffect(() => () => { try { recogRef.current?.stop(); } catch {} }, []);
+  useEffect(() => () => { try { recogRef.current?.stop(); } catch {} stopSpeaking(); }, []);
+
+  // Speak the greeting once it is on screen (best-effort; unlocks fully after
+  // the first tap). Re-runs only when voice is toggled on during the intro.
+  useEffect(() => {
+    if (stage === 'intro' && voiceOn) say(GREET);
+    // eslint-disable-next-line
+  }, [stage, voiceOn]);
 
   // Absorb whatever Aria heard on the latest turn (works for API + local).
   const absorbSensed = (next) => {
@@ -104,6 +119,7 @@ export default function Welcome() {
     const next = await fetchNext({ name: nm, exchanges: [] });
     absorbSensed(next);
     setCurrent(next); setTyped(false); setBusy(false);
+    say(next.question);
   };
 
   const answer = async (a) => {
@@ -115,8 +131,10 @@ export default function Welcome() {
 
     // Local crisis failsafe during onboarding: works even without the API.
     if (screenForCrisis(text).crisis) {
-      setCurrent({ question: crisisReply(name), choices: ['I reached out to someone', 'I want to keep going', 'Give me a minute'], depth: current.depth, crisis: true });
+      const cr = crisisReply(name);
+      setCurrent({ question: cr, choices: ['I reached out to someone', 'I want to keep going', 'Give me a minute'], depth: current.depth, crisis: true });
       setTyped(false);
+      say(cr);
       return;
     }
 
@@ -131,6 +149,7 @@ export default function Welcome() {
       }, 2600);
     } else {
       setCurrent(next); setTyped(false);
+      say(next.question);
     }
     setBusy(false);
   };
@@ -185,12 +204,18 @@ export default function Welcome() {
       {stage === 'intro' && (
         <div className="wiz-inner" style={{ alignItems: 'center', textAlign: 'center', gap: '1.3rem' }}>
           <div className="col center" style={{ gap: '.55rem' }}>
-            <span className="aria-orb" style={{ width: 84, height: 84 }} aria-hidden />
+            <span className={`aria-orb${!greetDone ? ' is-thinking' : ''}`} style={{ width: 84, height: 84 }} aria-hidden />
             <span className="wz-name">Aria <span className="wz-name-sub">your companion</span></span>
           </div>
-          <div className="wiz-q" style={{ minHeight: '4.5em', cursor: greetDone ? 'default' : 'pointer' }} onClick={skipIntro}>
+          <div className={`wiz-q${!greetDone ? ' wz-live' : ''}`} style={{ minHeight: '4.5em', cursor: greetDone ? 'default' : 'pointer' }} onClick={skipIntro}>
             {skipGreet ? GREET : <Typer text={GREET} speed={22} onDone={() => setGreetDone(true)} />}
           </div>
+          {speechAvailable() && (
+            <button className={`wz-voice${voiceOn ? ' on' : ''}`} onClick={toggleVoice} aria-pressed={voiceOn}
+              aria-label={voiceOn ? 'Aria is speaking, tap to mute' : 'Voice off, tap to let Aria speak'}>
+              <Icon name={voiceOn ? 'volume' : 'volumeOff'} size={15} /> {voiceOn ? 'Aria is speaking' : 'Voice off'}
+            </button>
+          )}
           {greetDone ? (
             <button className="btn btn-warm btn-lg fade-up" onClick={() => setStage('name')}>
               I'm ready <Icon name="arrowRight" size={18} />
@@ -220,11 +245,17 @@ export default function Welcome() {
       {stage === 'interview' && (
         <div className="wiz-inner">
           <div className="row gap-2" style={{ alignItems: 'center' }}>
-            <span className={`aria-orb${busy ? ' is-thinking' : ''}`} style={{ width: 44, height: 44 }} aria-hidden />
+            <span className={`aria-orb${busy || (current && !typed) ? ' is-thinking' : ''}`} style={{ width: 44, height: 44 }} aria-hidden />
             <div className="col" style={{ flex: 1, gap: '.35rem' }}>
-              <span className="t-xs muted" style={{ fontWeight: 650, letterSpacing: '.06em', textTransform: 'uppercase' }}>Aria is {phaseLabel(depth)}</span>
+              <span className="t-xs muted" style={{ fontWeight: 650, letterSpacing: '.06em', textTransform: 'uppercase' }}>Aria is {busy ? 'thinking' : current && !typed ? 'speaking' : phaseLabel(depth)}</span>
               <div className="warmbar"><i style={{ width: `${Math.max(6, depth)}%` }} /></div>
             </div>
+            {speechAvailable() && (
+              <button className={`wz-voice sm${voiceOn ? ' on' : ''}`} onClick={toggleVoice} aria-pressed={voiceOn}
+                aria-label={voiceOn ? 'Mute Aria' : 'Let Aria speak'} title={voiceOn ? 'Aria is speaking aloud' : 'Voice off'}>
+                <Icon name={voiceOn ? 'volume' : 'volumeOff'} size={16} />
+              </button>
+            )}
           </div>
 
           {topSensed.length > 0 && (
@@ -247,7 +278,7 @@ export default function Welcome() {
             <div className="wiz-q muted fade-up">Taking a breath...</div>
           ) : current && (
             <div className="wz-qenter" key={current.question}>
-              <div className="wiz-q">
+              <div className={`wiz-q${!typed ? ' wz-live' : ''}`}>
                 <Typer text={current.question} speed={18} onDone={() => setTyped(true)} />
               </div>
               {current.crisis && <CrisisCard resources={current.resources || CRISIS_RESOURCES} />}
@@ -358,6 +389,28 @@ export default function Welcome() {
 
         .wz-hint { font-size: .92rem; color: var(--n-600); max-width: 340px; }
 
+        /* Living text: a warm sheen sweeps across each line while Aria "speaks"
+           it, the way ChatGPT and Perplexity shimmer their streaming answers.
+           Paired with the pulsing orb and her actual voice, it reads as alive. */
+        .wz-live {
+          background: linear-gradient(100deg, var(--ink) 34%, var(--accent) 50%, var(--ink) 66%);
+          background-size: 220% 100%;
+          -webkit-background-clip: text; background-clip: text;
+          -webkit-text-fill-color: transparent; color: transparent;
+          animation: wzShimmer 2.3s linear infinite;
+        }
+        @keyframes wzShimmer { 0% { background-position: 175% 0; } 100% { background-position: -75% 0; } }
+
+        /* Voice toggle - shows Aria is talking, taps to mute. */
+        .wz-voice { display: inline-flex; align-items: center; gap: .42rem; font-family: inherit; font-size: .82rem; font-weight: 650;
+          color: var(--n-500); background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-pill);
+          padding: .4rem .85rem; cursor: pointer; transition: color .15s, background .15s, border-color .15s; }
+        .wz-voice:hover { border-color: var(--accent-300); color: var(--accent-700); }
+        .wz-voice.on { color: var(--accent-700); border-color: var(--accent-300); background: var(--accent-50); }
+        .wz-voice.on svg { animation: wzVoicePulse 1.6s ease-in-out infinite; }
+        .wz-voice.sm { padding: .45rem; flex: none; }
+        @keyframes wzVoicePulse { 0%,100% { transform: scale(1); opacity: .75; } 50% { transform: scale(1.12); opacity: 1; } }
+
         /* Question enters with a soft rise + clarity, so each new question feels handed to you. */
         @keyframes wzQEnter { from { opacity: 0; transform: translateY(12px); filter: blur(3px); } to { opacity: 1; transform: none; filter: none; } }
         .wz-qenter { animation: wzQEnter .5s var(--ease) both; }
@@ -384,8 +437,9 @@ export default function Welcome() {
         .wz-dom-emoji { animation: wzChipPop .5s var(--ease) both; }
 
         @media (prefers-reduced-motion: reduce) {
-          .wz-qenter, .wz-chip, .wz-weave, .wz-dom-emoji { animation: none !important; }
+          .wz-qenter, .wz-chip, .wz-weave, .wz-dom-emoji, .wz-voice.on svg { animation: none !important; }
           .wz-dots i { animation: none !important; opacity: .6 !important; }
+          .wz-live { animation: none !important; background: none !important; -webkit-text-fill-color: var(--ink) !important; color: var(--ink) !important; }
         }
       `}</style>
     </div>

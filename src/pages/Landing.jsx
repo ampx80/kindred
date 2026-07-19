@@ -67,8 +67,9 @@ function Headline({ children }) {
   return (
     <span className="k-reveal-words">
       {words.map((w, i) => (
-        <span key={i} className="w" style={{ animationDelay: `${0.15 + i * 0.075}s` }}>
-          {w}{i < words.length - 1 ? ' ' : ''}
+        <span key={i} className="wq">
+          <span className="w" style={{ animationDelay: `${0.15 + i * 0.075}s` }}>{w}</span>
+          {i < words.length - 1 ? ' ' : ''}
         </span>
       ))}
     </span>
