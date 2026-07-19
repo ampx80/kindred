@@ -463,8 +463,12 @@ h1, .wiz-q, .k-hero__title { letter-spacing: -.022em; }
 .k-hero__lead { font-size: clamp(1.1rem, 2.1vw, 1.3rem); line-height: 1.6; color: var(--n-700); max-width: 560px; margin: 0; }
 .k-eyebrow { display: inline-flex; align-items: center; gap: .5rem; font-size: .82rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--accent-700); background: color-mix(in srgb, var(--accent-50) 82%, transparent); border: 1px solid var(--accent-300); padding: .4rem .85rem; border-radius: 999px; }
 
-/* Word-by-word headline stagger */
-.k-reveal-words .w { display: inline-block; opacity: 0; transform: translateY(22px) rotate(1.2deg); animation: wordUp .7s var(--ease) forwards; }
+/* Word-by-word headline stagger. Words are inline-block so they can animate,
+   which means the space between them must come from margin (inline-block eats
+   trailing whitespace text nodes), never from a text-node space. */
+.k-reveal-words { word-spacing: normal; }
+.k-reveal-words .w { display: inline-block; margin-right: .26em; opacity: 0; transform: translateY(22px) rotate(1.2deg); animation: wordUp .7s var(--ease) forwards; }
+.k-reveal-words .w:last-child { margin-right: 0; }
 @keyframes wordUp { to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .k-reveal-words .w { opacity: 1 !important; transform: none !important; animation: none !important; } }
 
