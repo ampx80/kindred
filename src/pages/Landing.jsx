@@ -299,6 +299,20 @@ function Glimpse() {
   );
 }
 
+// The Kindred Guides library - 1,100+ free guides, our SEO/GEO backlink engine.
+const GUIDES_URL = 'https://kindred-guides.vercel.app';
+const GUIDE_CLUSTERS = [
+  { slug: 'mindset', emoji: '🧠', label: 'Mind and mental fitness' },
+  { slug: 'sleep', emoji: '🌙', label: 'Sleep and rest' },
+  { slug: 'movement', emoji: '💪', label: 'Movement and strength' },
+  { slug: 'nutrition', emoji: '🥗', label: 'Nutrition and energy' },
+  { slug: 'relationships', emoji: '🤝', label: 'Relationships' },
+  { slug: 'habits', emoji: '🌱', label: 'Habits and routines' },
+  { slug: 'purpose', emoji: '⭐', label: 'Purpose and faith' },
+  { slug: 'hard-days', emoji: '🌅', label: 'Hard days' },
+  { slug: 'compare', emoji: '⚖️', label: 'App comparisons' },
+];
+
 const STEPS = [
   { icon: 'sparkles', t: 'Meet Aria', d: 'One warm conversation. No forms, no homework. She simply listens.' },
   { icon: 'compass', t: 'Map any life', d: 'Faith, the gym, your people, the book, even watching more TV to actually rest. Nothing is too small or too weird.' },
@@ -676,7 +690,43 @@ export default function Landing() {
         </div>
       </section>
 
-      <footer className="k-foot">Kindred, your life, with company.</footer>
+      {/* ---------------- FOOTER + GUIDE BACKLINKS ---------------- */}
+      <footer className="k-foot">
+        <div className="k-wrap k-foot__grid">
+          <div className="k-foot__brand">
+            <div className="row gap-2" style={{ alignItems: 'center' }}>
+              <span className="aria-orb" style={{ width: 34, height: 34 }} aria-hidden />
+              <strong style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', color: 'var(--ink)' }}>Kindred</strong>
+            </div>
+            <p className="k-foot__tag">Your life, with company. One kept promise a day, with someone who remembers every one.</p>
+            <span className="k-pulse" style={{ display: 'inline-block' }}>
+              <button className="btn btn-warm" onClick={meetAria}>Meet Aria <Icon name="arrowRight" size={16} /></button>
+            </span>
+          </div>
+
+          <nav className="k-foot__col k-foot__guides" aria-label="Kindred Guides">
+            <h4 className="k-foot__h">Free guides</h4>
+            <a className="k-foot__link k-foot__link--lead" href={`${GUIDES_URL}/pages/`}>All 1,100+ guides <Icon name="arrowRight" size={13} /></a>
+            <div className="k-foot__links">
+              {GUIDE_CLUSTERS.map(c => (
+                <a key={c.slug} className="k-foot__link" href={`${GUIDES_URL}/pages/${c.slug}/`}>{c.emoji} {c.label}</a>
+              ))}
+            </div>
+          </nav>
+
+          <nav className="k-foot__col" aria-label="Kindred">
+            <h4 className="k-foot__h">Kindred</h4>
+            <button className="k-foot__link" onClick={meetAria}>Start free</button>
+            <button className="k-foot__link" onClick={meetAria}>Meet Aria</button>
+            <a className="k-foot__link" href={`${GUIDES_URL}/about/`}>About the guides</a>
+            <a className="k-foot__link" href={GUIDES_URL}>Guides home</a>
+          </nav>
+        </div>
+        <div className="k-wrap k-foot__base">
+          <span>Kindred, your life, with company.</span>
+          <span className="k-foot__fine">Guides are general wellness information, reviewed against reputable sources. Not medical advice.</span>
+        </div>
+      </footer>
 
       {/* ---------------- STICKY CTA ---------------- */}
       <div className={`kl-sticky${sticky ? ' show' : ''}`} aria-hidden={!sticky}>

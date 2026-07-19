@@ -549,7 +549,22 @@ h1, .wiz-q, .k-hero__title { letter-spacing: -.022em; }
 /* --- Closing card --- */
 .k-closer { text-align: center; background: linear-gradient(135deg, var(--accent-50), var(--rose-bg) 55%, var(--gold-bg)); border: 1px solid var(--line); border-radius: var(--r-xl); padding: 3.2rem 1.6rem; max-width: 720px; margin: 0 auto; }
 [data-theme="dark"] .k-closer { background: linear-gradient(135deg, #2b1a14, #2a1620 55%, #2a2110); }
-.k-foot { text-align: center; padding: 2rem 1.4rem 3rem; color: var(--n-400); font-size: .9rem; }
+.k-foot { padding: 3.2rem 0 2rem; color: var(--n-500); font-size: .9rem; border-top: 1px solid var(--line); margin-top: 2rem; background: color-mix(in srgb, var(--paper) 70%, transparent); }
+.k-foot__grid { display: grid; grid-template-columns: 1.4fr 1.6fr 1fr; gap: 2.4rem 2rem; align-items: start; }
+.k-foot__brand { display: flex; flex-direction: column; gap: .85rem; max-width: 320px; }
+.k-foot__tag { color: var(--n-600); line-height: 1.55; margin: 0; }
+.k-foot__h { font-size: .78rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent-700); margin: .1rem 0 .9rem; }
+.k-foot__col { display: flex; flex-direction: column; gap: .1rem; }
+.k-foot__links { display: grid; grid-template-columns: 1fr 1fr; gap: .1rem .8rem; }
+.k-foot__link { display: inline-flex; align-items: center; gap: .35rem; background: none; border: 0; padding: .32rem 0; font: inherit; text-align: left; color: var(--n-600); text-decoration: none; cursor: pointer; transition: color .15s, transform .15s; }
+.k-foot__link:hover { color: var(--accent-700); transform: translateX(2px); }
+.k-foot__link--lead { font-weight: 650; color: var(--ink); margin-bottom: .3rem; }
+.k-foot__base { display: flex; flex-wrap: wrap; gap: .3rem 1.2rem; align-items: baseline; margin-top: 2.4rem; padding-top: 1.4rem; border-top: 1px solid var(--line); color: var(--n-400); font-size: .84rem; }
+.k-foot__fine { color: var(--n-400); font-size: .8rem; }
+@media (max-width: 760px) {
+  .k-foot__grid { grid-template-columns: 1fr; gap: 1.8rem; }
+  .k-foot__links { grid-template-columns: 1fr 1fr; }
+}
 
 /* ============================================================
    BALANCE ORBIT - the Life Balance visual (radar + orbiting nodes)
