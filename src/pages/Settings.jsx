@@ -6,12 +6,21 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, Button, Field, Input, Select, SectionHeader, useToast } from '../components/UI.jsx';
 import { Icon } from '../components/icons.jsx';
-import { useStore, getProfile, saveSettings, resetStore, exportData, domainMeta, TONES, setFaith, getFaith, FAITH_TRADITIONS } from '../lib/store.js';
+import { useStore, getProfile, saveSettings, resetStore, exportData, domainMeta, TONES, setFaith, getFaith, FAITH_TRADITIONS, getReminders } from '../lib/store.js';
 import { onAccount, getAccount, signup, login, logout, forgetAccountLocal, authHeader } from '../lib/account.js';
 import { enablePush, disablePush, pushSupported, notificationPermission } from '../lib/push.js';
+import { openNotifyWizard } from '../components/NotifyWizard.jsx';
 import { speak, speechAvailable } from '../lib/voice.js';
 import { sharePortrait } from '../lib/share.js';
 import { summary as analyticsSummary } from '../lib/analytics.js';
+
+// Format a 0-23 hour as a friendly "8:00 AM" for the reminder-times summary.
+function fmtHour(h) {
+  const period = h < 12 ? 'AM' : 'PM';
+  let hr = h % 12;
+  if (hr === 0) hr = 12;
+  return `${hr}:00 ${period}`;
+}
 
 function AuthCard({ account }) {
   const toast = useToast();
@@ -170,6 +179,18 @@ export default function Settings() {
 
   const tone = profile?.tone && TONES[profile.tone];
 
+  // Current reminder schedule. getReminders() gives tz-safe hour values; the raw
+  // settings row tells us which slots are explicitly off (null) so we do not show
+  // a time for a slot the user turned off.
+  const reminders = getReminders();
+  const remRaw = (settings && settings.reminders) || null;
+  const remOn = !!(remRaw && remRaw.enabled);
+  const remParts = [];
+  if (remOn) {
+    if (remRaw.morning !== null) remParts.push(`Morning ${fmtHour(reminders.morning)}`);
+    if (remRaw.evening !== null) remParts.push(`Evening ${fmtHour(reminders.evening)}`);
+  }
+
   return (
     <div className="stack-lg" style={{ maxWidth: 760 }}>
       <SectionHeader eyebrow="Settings" title="You, in control" sub="Your account, your voice, your data. Nothing here is out of your hands." />
@@ -190,9 +211,17 @@ export default function Settings() {
             <button className={`kd-switch${settings.voiceOn ? ' on' : ''}`} onClick={toggleVoice} aria-pressed={settings.voiceOn} aria-label="Toggle Aria voice"><span /></button>
           </div>
           <div className="row between gap-2" style={{ borderTop: '1px solid var(--line)', paddingTop: '.9rem' }}>
-            <div className="col" style={{ gap: '.15rem', minWidth: 0 }}>
-              <span className="fw-7 row gap-1" style={{ fontSize: '1.05rem' }}><Icon name="heart" size={18} /> One daily nudge</span>
-              <span className="muted t-sm">A single warm reminder a day. Never a nag, off anytime.</span>
+            <div className="col" style={{ gap: '.2rem', minWidth: 0 }}>
+              <span className="fw-7 row gap-1" style={{ fontSize: '1.05rem' }}><Icon name="heart" size={18} /> Daily nudges</span>
+              <span className="muted t-sm">One or two soft reminders a day. Never a nag, off anytime.</span>
+              {remOn && remParts.length > 0 && (
+                <span className="t-sm" style={{ color: 'var(--sage)' }}>{remParts.join(', ')}</span>
+              )}
+              <button
+                className="linkish"
+                onClick={openNotifyWizard}
+                style={{ background: 'none', border: 'none', color: 'var(--accent-700)', cursor: 'pointer', fontSize: '.92rem', padding: 0, textAlign: 'left', marginTop: '.1rem' }}
+              >{remOn ? 'Set reminder times' : 'Set up reminders'}</button>
             </div>
             <button className={`kd-switch${pushOn ? ' on' : ''}`} onClick={toggleNudge} aria-pressed={pushOn} aria-label="Toggle daily nudge"><span /></button>
           </div>

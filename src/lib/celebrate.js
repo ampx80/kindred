@@ -66,3 +66,14 @@ export function celebrate({ x, y, count = 120, spread = 1 } = {}) {
   };
   raf = requestAnimationFrame(tick);
 }
+
+// Fire a burst centered on a DOM element (or a React event). Handy for "tap the
+// ring, confetti blooms from the ring" moments without measuring by hand.
+export function burstFrom(elOrEvent, opts = {}) {
+  try {
+    const el = elOrEvent?.currentTarget || elOrEvent?.target || elOrEvent;
+    const r = el && el.getBoundingClientRect ? el.getBoundingClientRect() : null;
+    if (!r) return celebrate(opts);
+    celebrate({ x: r.left + r.width / 2, y: r.top + r.height / 2, count: 70, spread: 0.9, ...opts });
+  } catch { celebrate(opts); }
+}

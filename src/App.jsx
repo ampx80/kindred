@@ -1,9 +1,15 @@
-import { useEffect, useState, Component } from 'react';
+import { useEffect, useState, Component, lazy, Suspense } from 'react';
 import { Routes, Route, NavLink, Navigate, useLocation, useNavigate, Link } from 'react-router-dom';
 import { Icon } from './components/icons.jsx';
 import { useStore, resetStore } from './lib/store.js';
 import { applyTheme, useTheme, toggleTheme } from './lib/theme.js';
+import { trackPageview } from './lib/track.js';
 import AriaDock from './components/AriaDock.jsx';
+import NotifyWizard from './components/NotifyWizard.jsx';
+
+const Admin = lazy(() => import('./pages/Admin.jsx'));
+const Engines = lazy(() => import('./pages/Engines.jsx'));
+const EngineDetail = lazy(() => import('./pages/EngineDetail.jsx'));
 import Landing from './pages/Landing.jsx';
 import Welcome from './pages/Welcome.jsx';
 import Today from './pages/Today.jsx';
@@ -18,10 +24,11 @@ import Settings from './pages/Settings.jsx';
 import Tools from './pages/Tools.jsx';
 import ToolPage from './pages/ToolPage.jsx';
 
-const APP_SEGS = new Set(['today', 'paths', 'journal', 'people', 'foryou', 'growth', 'settings', 'tools']);
+const APP_SEGS = new Set(['today', 'paths', 'journal', 'people', 'foryou', 'growth', 'settings', 'tools', 'engines']);
 
 const NAV = [
   { to: '/today', label: 'Today', icon: 'sun' },
+  { to: '/engines', label: 'Engines', icon: 'layers' },
   { to: '/paths', label: 'Paths', icon: 'compass' },
   { to: '/tools', label: 'Tools', icon: 'sparkles' },
   { to: '/journal', label: 'Journal', icon: 'book' },
@@ -29,7 +36,11 @@ const NAV = [
   { to: '/foryou', label: 'For you', icon: 'target' },
   { to: '/growth', label: 'Growth', icon: 'trophy' },
 ];
-const TABS = [NAV[0], NAV[1], NAV[2], NAV[4], NAV[6]]; // bottom bar: Today, Paths, Tools, People, Growth
+const TABS = [NAV[0], NAV[1], NAV[2], NAV[3], NAV[7]]; // bottom bar: Today, Engines, Paths, Tools, Growth
+
+function PageSpin() {
+  return <div className="col center" style={{ minHeight: '50vh' }}><span className="aria-orb is-thinking" style={{ width: 44, height: 44 }} aria-hidden /></div>;
+}
 
 function Rail() {
   const profile = useStore(s => s.profile);
@@ -193,10 +204,20 @@ export default function App() {
   const [moreOpen, setMoreOpen] = useState(false);
 
   useEffect(() => { applyTheme(); }, []);
-  useEffect(() => { window.scrollTo(0, 0); setMoreOpen(false); }, [loc.pathname]);
+  useEffect(() => { window.scrollTo(0, 0); setMoreOpen(false); trackPageview(loc.pathname); }, [loc.pathname]);
 
   const seg = loc.pathname.split('/')[1] || '';
   const inApp = APP_SEGS.has(seg);
+
+  // Owner-only dashboard. Reachable without a local profile (an admin may open it
+  // on a fresh device); the server enforces who is actually allowed to see data.
+  if (seg === 'admin') {
+    return (
+      <Suspense fallback={<div className="col center" style={{ minHeight: '60vh' }}><span className="aria-orb" style={{ width: 48, height: 48 }} aria-hidden /></div>}>
+        <Admin />
+      </Suspense>
+    );
+  }
 
   if (!inApp) {
     return (
@@ -221,6 +242,9 @@ export default function App() {
             <ErrorBoundary key={loc.pathname}>
             <Routes location={loc}>
               <Route path="/today" element={<Today />} />
+              <Route path="/engines" element={<Suspense fallback={<PageSpin />}><Engines /></Suspense>} />
+              <Route path="/engines/:id" element={<Suspense fallback={<PageSpin />}><EngineDetail /></Suspense>} />
+              <Route path="/engines/:id/:toolId" element={<Suspense fallback={<PageSpin />}><EngineDetail /></Suspense>} />
               <Route path="/paths" element={<Paths />} />
               <Route path="/paths/:id" element={<PathDetail />} />
               <Route path="/journal" element={<Journal />} />
@@ -241,6 +265,7 @@ export default function App() {
       <TabBar onMore={() => setMoreOpen(o => !o)} moreOpen={moreOpen} />
       <MoreSheet open={moreOpen} onClose={() => setMoreOpen(false)} />
       <AriaDock />
+      <NotifyWizard />
     </div>
   );
 }

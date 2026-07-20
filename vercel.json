@@ -7,6 +7,6 @@
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "crons": [
-    { "path": "/api/push-send", "schedule": "0 15 * * *" }
+    { "path": "/api/push-send", "schedule": "0 * * * *" }
   ]
 }

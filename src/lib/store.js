@@ -5,7 +5,7 @@
 // persists to localStorage, Supabase-swappable: every function carries a
 // `// SUPABASE:` note describing the live equivalent.
 import { useEffect, useState } from 'react';
-import { track } from './analytics.js';
+import { track } from './track.js';
 
 const LS_KEY = 'kindred_state_v1';   // bump to force a clean reseed
 
@@ -460,6 +460,51 @@ export function saveSettings(patch) {
   return { settings: state.settings };
 }
 
+// Daily reminder preferences (used by the notification wizard + the per-user
+// scheduled push). Hours are 0-23 in the user's local time, or null for "off".
+export function getReminders() {
+  const r = (state.settings && state.settings.reminders) || {};
+  return {
+    enabled: !!r.enabled,
+    morning: Number.isInteger(r.morning) ? r.morning : 8,
+    evening: Number.isInteger(r.evening) ? r.evening : 21,
+    tz: r.tz || (Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'),
+  };
+}
+export function setReminders(patch) {
+  const next = { ...getReminders(), ...patch };
+  commit({ ...state, settings: { ...state.settings, reminders: next } });
+  return next;
+}
+
+/* ---------------- LIFE ENGINES ----------------
+   Deep, domain-specific modules Aria equips the user with (Faith and Scripture,
+   Fitness, Reading, Career, Mindfulness, and many more). A person runs several
+   at once. Activated engines are stored on the profile as { id, name, emoji } so
+   they sync across devices and flow into Aria's context and every generator. */
+export function getActiveEngines() {
+  return (state.profile && Array.isArray(state.profile.engines)) ? state.profile.engines : [];
+}
+export function getActiveEngineIds() { return getActiveEngines().map(e => e.id); }
+export function isEngineActive(id) { return getActiveEngineIds().includes(id); }
+export function activateEngine(engine) {
+  if (!state.profile || !engine || !engine.id) return { error: true, message: 'No profile yet.' };
+  const cur = getActiveEngines();
+  if (cur.some(e => e.id === engine.id)) return { engines: cur };
+  const meta = { id: engine.id, name: engine.name || engine.id, emoji: engine.emoji || '\u2728' };
+  const engines = [...cur, meta];
+  commit({ ...state, profile: { ...state.profile, engines } });
+  track('engine_activate', { id: engine.id });
+  return { engines };
+}
+export function deactivateEngine(id) {
+  if (!state.profile) return { error: true };
+  const engines = getActiveEngines().filter(e => e.id !== id);
+  commit({ ...state, profile: { ...state.profile, engines } });
+  track('engine_deactivate', { id });
+  return { engines };
+}
+
 /* ---------------- FAITH + VALUES (optional, inclusive) ---------------- */
 export const getFaith = () => (state.profile && state.profile.faith) || null;
 // SUPABASE: update profiles set faith = jsonb
@@ -609,6 +654,8 @@ export function buildProfileText() {
   if (state.people.length) lines.push('People they care about: ' + state.people.slice(0, 8).map(pe => `${pe.name}${pe.relation ? ` (${pe.relation})` : ''}`).join(', ') + '.');
   const mt = moodTrend(5);
   if (mt) lines.push(`Recent mood average: ${mt.avg} out of 5 over ${mt.count} check-ins.`);
+  const engines = getActiveEngines();
+  if (engines.length) lines.push('Life engines Aria equips them with: ' + engines.map(e => e.name).join(', ') + '. Draw on these when relevant.');
   return lines.join('\n');
 }
 
