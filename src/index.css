@@ -772,3 +772,34 @@ h1, .wiz-q, .k-hero__title { letter-spacing: -.022em; }
   display: grid; place-items: center; flex: none; }
 @media (prefers-reduced-motion: reduce) { .kd-sheet-scrim, .kd-sheet { animation: none; } }
 @media (min-width: 861px) { .kd-tab-more { display: none; } }
+
+/* ============================================================
+   NATIVE SHELL (Capacitor iOS / Android)
+   Safe-area insets for notches and the home indicator, keyboard
+   comfort, and small touches so the wrapped web app feels native.
+   Applied only when <html> carries .is-native (set by native.js).
+   ============================================================ */
+.is-native, .is-native body {
+  overscroll-behavior-y: none;              /* kill the rubber-band glow at the edges */
+  -webkit-tap-highlight-color: transparent; /* no grey flash on tap */
+}
+.is-native body { user-select: none; -webkit-user-select: none; }
+.is-native input, .is-native textarea, .is-native [contenteditable] { user-select: text; -webkit-user-select: text; }
+
+/* Push page content and the side rail below the status bar / notch. */
+.is-native .kd-content { padding-top: calc(1.1rem + env(safe-area-inset-top, 0px)); }
+.is-native .kd-rail { padding-top: env(safe-area-inset-top, 0px); }
+@media (min-width: 861px) {
+  .is-native .kd-content { padding-top: calc(1.9rem + env(safe-area-inset-top, 0px)); }
+}
+
+/* Any fixed top bar (Aria header, demo banner) clears the notch too. */
+.is-native .demo-banner { padding-top: calc(.5rem + env(safe-area-inset-top, 0px)); }
+
+/* The floating Aria button rides above the tab bar and home indicator. */
+.is-native .aria-fab { bottom: calc(5.6rem + env(safe-area-inset-bottom, 0px)); }
+
+/* When the soft keyboard is open, drop the bottom tab bar so it never covers
+   the field being typed into. */
+.is-native.kb-open .kd-tabbar { transform: translateY(120%); transition: transform .18s ease; }
+.is-native.kb-open .aria-fab { display: none; }

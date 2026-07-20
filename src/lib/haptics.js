@@ -31,9 +31,30 @@ const PATTERNS = {
   warn: [30, 60, 30],
 };
 
+// Inside the native shell we drive the real Taptic Engine (iOS) / vibrator
+// (Android) through Capacitor's Haptics plugin, which feels far crisper than the
+// web Vibration API. Read off the injected global so the web path stays free of
+// any Capacitor dependency.
+function nativeHaptics() {
+  const c = typeof window !== 'undefined' && window.Capacitor;
+  if (c && typeof c.isNativePlatform === 'function' && c.isNativePlatform() && c.Plugins && c.Plugins.Haptics) {
+    return c.Plugins.Haptics;
+  }
+  return null;
+}
+
 export function haptic(kind = 'light') {
   try {
     if (!hapticsEnabled() || reduced()) return;
+    const nh = nativeHaptics();
+    if (nh) {
+      if (kind === 'success' || kind === 'celebrate') nh.notification({ type: 'SUCCESS' }).catch(() => {});
+      else if (kind === 'warn') nh.notification({ type: 'WARNING' }).catch(() => {});
+      else nh.impact({ style: kind === 'medium' ? 'MEDIUM' : 'LIGHT' }).catch(() => {});
+      // A celebrate gets a quick second tap for a richer flourish.
+      if (kind === 'celebrate') setTimeout(() => { try { nh.impact({ style: 'HEAVY' }).catch(() => {}); } catch {} }, 90);
+      return;
+    }
     if (typeof navigator === 'undefined' || !navigator.vibrate) return;
     navigator.vibrate(PATTERNS[kind] || PATTERNS.light);
   } catch {}

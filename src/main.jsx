@@ -6,12 +6,19 @@ import { ToastHost } from './components/UI.jsx';
 import { initSync } from './lib/sync.js';
 import { registerServiceWorker } from './lib/push.js';
 import { initTracking } from './lib/track.js';
+import { initNative, isNative } from './lib/native.js';
 import './index.css';
 
+// Native shell (Capacitor iOS/Android): route API calls to production, theme the
+// status bar, wire the back button and keyboard, add safe-area insets, register
+// native push, and dismiss the splash. Inert on the web. Run this first so the
+// API router is installed before anything fetches.
+initNative();
 // Durable layer: pull the server record on sign-in, push changes as they happen.
 initSync();
-// PWA: installable + offline shell + push receiver. Safe no-op where unsupported.
-registerServiceWorker();
+// PWA: installable + offline shell + push receiver. On the web only; the native
+// shell uses native push instead of a service worker.
+if (!isNative()) registerServiceWorker();
 // Telemetry: local return-visit signal + batched, content-free events to the
 // server so the admin dashboard can see activation and engagement.
 initTracking();

@@ -1,0 +1,30 @@
+{
+  "appId": "com.kindred.app",
+  "appName": "Kindred",
+  "webDir": "dist",
+  "backgroundColor": "#faf5ef",
+  "ios": {
+    "backgroundColor": "#faf5ef",
+    "contentInset": "never"
+  },
+  "android": {
+    "backgroundColor": "#faf5ef"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 900,
+      "launchAutoHide": false,
+      "backgroundColor": "#faf5ef",
+      "showSpinner": false,
+      "androidScaleType": "CENTER_CROP",
+      "splashFullScreen": true,
+      "splashImmersive": true
+    },
+    "Keyboard": {
+      "resize": "native"
+    },
+    "PushNotifications": {
+      "presentationOptions": ["badge", "sound", "alert"]
+    }
+  }
+}

@@ -1,8 +1,21 @@
 // Shared utilities for Kindred serverless routes.
 // Every route: `export default withErrorHandling(async (req, res) => { ... })`
 
+// Native apps (Capacitor iOS/Android) load from capacitor://localhost or
+// http://localhost and call this same backend cross-origin. Auth is by bearer
+// token (never cookies), so a permissive CORS policy is safe and lets the native
+// shells talk to production with zero per-route changes. Preflight is answered here.
+function applyCors(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Kindred-Anon');
+  res.setHeader('Access-Control-Max-Age', '86400');
+}
+
 export function withErrorHandling(fn) {
   return async (req, res) => {
+    applyCors(req, res);
+    if (req.method === 'OPTIONS') return res.status(204).end();
     try {
       return await fn(req, res);
     } catch (e) {
