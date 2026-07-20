@@ -6,10 +6,16 @@ import { applyTheme, useTheme, toggleTheme } from './lib/theme.js';
 import { trackPageview } from './lib/track.js';
 import AriaDock from './components/AriaDock.jsx';
 import NotifyWizard from './components/NotifyWizard.jsx';
+import GameHud from './components/GameHud.jsx';
 
+const GameLayer = lazy(() => import('./components/GameLayer.jsx'));
 const Admin = lazy(() => import('./pages/Admin.jsx'));
 const Engines = lazy(() => import('./pages/Engines.jsx'));
 const EngineDetail = lazy(() => import('./pages/EngineDetail.jsx'));
+const Quests = lazy(() => import('./pages/Quests.jsx'));
+const Achievements = lazy(() => import('./pages/Achievements.jsx'));
+const Rewards = lazy(() => import('./pages/Rewards.jsx'));
+const Journey = lazy(() => import('./pages/Journey.jsx'));
 import Landing from './pages/Landing.jsx';
 import Welcome from './pages/Welcome.jsx';
 import Today from './pages/Today.jsx';
@@ -24,7 +30,7 @@ import Settings from './pages/Settings.jsx';
 import Tools from './pages/Tools.jsx';
 import ToolPage from './pages/ToolPage.jsx';
 
-const APP_SEGS = new Set(['today', 'paths', 'journal', 'people', 'foryou', 'growth', 'settings', 'tools', 'engines']);
+const APP_SEGS = new Set(['today', 'paths', 'journal', 'people', 'foryou', 'growth', 'settings', 'tools', 'engines', 'quests', 'achievements', 'rewards', 'journey']);
 
 const NAV = [
   { to: '/today', label: 'Today', icon: 'sun' },
@@ -120,8 +126,12 @@ function MoreSheet({ open, onClose }) {
   if (!open) return null;
   const go = (to) => { onClose(); nav(to); };
   const items = [
+    { to: '/journey', label: 'Journey', icon: 'trophy', sub: 'Your streaks, growth, and story' },
+    { to: '/quests', label: 'Quests', icon: 'target', sub: "Today's quests and rewards" },
+    { to: '/achievements', label: 'Achievements', icon: 'sparkles', sub: 'Everything you have unlocked' },
+    { to: '/rewards', label: 'Spark shop', icon: 'flame', sub: 'Spend your sparks' },
     { to: '/journal', label: 'Journal', icon: 'book', sub: 'Everything you have said, kept' },
-    { to: '/foryou', label: 'For you', icon: 'target', sub: "Aria's picks, tuned to you" },
+    { to: '/foryou', label: 'For you', icon: 'heart', sub: "Aria's picks, tuned to you" },
     { to: '/settings', label: 'Settings', icon: 'settings', sub: 'Account, sync, privacy, export' },
   ];
   return (
@@ -236,6 +246,7 @@ export default function App() {
       <div className="ambient" aria-hidden><span className="b1" /><span className="b2" /><span className="b3" /></div>
       <Rail />
       <div className="kd-main">
+        <GameHud />
         <main className="kd-content">
           <DemoBanner />
           <div key={loc.pathname} className="page-in">
@@ -252,6 +263,10 @@ export default function App() {
               <Route path="/people/:id" element={<PersonDetail />} />
               <Route path="/foryou" element={<ForYou />} />
               <Route path="/growth" element={<Growth />} />
+              <Route path="/journey" element={<Suspense fallback={<PageSpin />}><Journey /></Suspense>} />
+              <Route path="/quests" element={<Suspense fallback={<PageSpin />}><Quests /></Suspense>} />
+              <Route path="/achievements" element={<Suspense fallback={<PageSpin />}><Achievements /></Suspense>} />
+              <Route path="/rewards" element={<Suspense fallback={<PageSpin />}><Rewards /></Suspense>} />
               <Route path="/tools" element={<Tools />} />
               <Route path="/tools/saved/:sub" element={<ToolPage />} />
               <Route path="/tools/:id" element={<ToolPage />} />
@@ -266,6 +281,7 @@ export default function App() {
       <MoreSheet open={moreOpen} onClose={() => setMoreOpen(false)} />
       <AriaDock />
       <NotifyWizard />
+      <Suspense fallback={null}><GameLayer /></Suspense>
     </div>
   );
 }

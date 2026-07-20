@@ -15,6 +15,19 @@ let queue = [];
 let timer = null;
 let started = false;
 
+// Lightweight in-app event bus. Every track() call is broadcast to subscribers so
+// features like the gamification engine can react to real actions (a goal done, a
+// day closed, a reflection written) without any page needing to wire them in.
+const listeners = new Set();
+export function onTrack(fn) {
+  if (typeof fn !== 'function') return () => {};
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+function emitTrack(name, props) {
+  for (const fn of listeners) { try { fn(name, props); } catch {} }
+}
+
 function anonId() {
   try {
     let id = localStorage.getItem(ANON_KEY);
@@ -64,6 +77,7 @@ export function track(name, props = {}) {
     if (queue.length >= MAX_QUEUE) flush();
     else scheduleFlush();
   } catch {}
+  emitTrack(name, props);
 }
 
 export function trackPageview(path) {

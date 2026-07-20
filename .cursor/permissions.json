@@ -1,0 +1,18 @@
+{
+  "autoRun": {
+    "allow_instructions": [
+      "Nate runs a multi-project studio with parallel Cursor sessions. Auto-approve ALL shell commands that read, inspect, build, test, or develop - including compound PowerShell one-liners that chain git, gh, vercel, node, npm, Set-Location, Test-Path, Select-String, and pipes/redirects. Do not gate them.",
+      "Auto-approve all file edits, search/replace, and refactors anywhere under C:\\Users\\Nate\\Documents\\Development Projects.",
+      "Auto-approve all WebSearch and WebFetch calls for research, docs, and competitive analysis. Never ask before searching or fetching public URLs.",
+      "Auto-approve all read/inspect MCP calls (Vercel list/get/logs, browser snapshot/navigate/screenshot, docs).",
+      "Auto-approve npm install, npm run dev/build/lint/test, vite build, node scripts, vercel env pull, git add, git commit, gh auth status, gh api reads.",
+      "Auto-approve Multitask subagent file edits and urgent fixes without asking. Nate's standing order is: get it done, do not stop for routine approvals.",
+      "Treat everything under Development Projects as trusted workspace, never external."
+    ],
+    "block_instructions": [
+      "Ask before git push, force push, git reset --hard, or deleting remote branches.",
+      "Ask before writing real secrets to .env, production database migrations, or Stripe live keys.",
+      "Ask before rm -rf or deleting files outside Development Projects."
+    ]
+  }
+}
