@@ -11,6 +11,7 @@ import { useGame, onGameMoment } from '../lib/game.js';
 import * as store from '../lib/store.js';
 import * as sfx from '../lib/sound.js';
 import { haptic } from '../lib/haptics.js';
+import FxBackdrop from './FxBackdrop.jsx';
 
 const reduced = () =>
   typeof window !== 'undefined' && window.matchMedia &&
@@ -136,6 +137,7 @@ export default function GameHud() {
 
   return (
     <div className="kdhud-wrap" role="banner" aria-label="Your progress">
+      <FxBackdrop className="kdhud-fx" density={22} glow="250,138,74" />
       <div className="kdhud-inner">
         {/* 1) Rank + level + XP ring, taps through to the Journey */}
         <Link
@@ -146,11 +148,20 @@ export default function GameHud() {
         >
           <span className="kdhud-ring" aria-hidden>
             <svg width={RING} height={RING} viewBox={`0 0 ${RING} ${RING}`}>
+              <defs>
+                <linearGradient id="kdhudHoloGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="rgb(var(--fx-amber))" />
+                  <stop offset="28%" stopColor="rgb(var(--fx-gold))" />
+                  <stop offset="52%" stopColor="rgb(var(--fx-magenta))" />
+                  <stop offset="76%" stopColor="rgb(var(--fx-violet))" />
+                  <stop offset="100%" stopColor="rgb(var(--fx-cyan))" />
+                </linearGradient>
+              </defs>
               <circle cx={RING / 2} cy={RING / 2} r={r} fill="none" stroke="var(--n-100)" strokeWidth={STROKE} />
               <circle
                 className="kdhud-ring-fill"
                 cx={RING / 2} cy={RING / 2} r={r} fill="none"
-                stroke="var(--accent)" strokeWidth={STROKE} strokeLinecap="round"
+                stroke="url(#kdhudHoloGrad)" strokeWidth={STROKE} strokeLinecap="round"
                 strokeDasharray={circ} strokeDashoffset={off}
                 transform={`rotate(-90 ${RING / 2} ${RING / 2})`}
               />
@@ -159,8 +170,8 @@ export default function GameHud() {
           </span>
           <span className="kdhud-lvl-text">
             <span className="kdhud-rank">{g.rank}</span>
-            <span className="kdhud-bar-track" aria-hidden>
-              <span className="kdhud-bar-fill" style={{ width: `${pct * 100}%` }} />
+            <span className="kdhud-bar-track fx-shimmer" aria-hidden>
+              <span className="kdhud-bar-fill fx-holo-fill" style={{ width: `${pct * 100}%` }} />
             </span>
           </span>
           {floaters.map((f) => (
@@ -201,19 +212,33 @@ export default function GameHud() {
       {sweep > 0 && !reduced() && <span key={sweep} className="kdhud-sweep" aria-hidden />}
 
       <style>{`
+        /* Holographic command bar: frosted glass base, quiet aurora wash behind,
+           a faint moving iridescent hairline underline. Slim at rest. */
         .kdhud-wrap {
           position: sticky; top: 0; z-index: 30; width: 100%;
-          background: color-mix(in srgb, var(--paper) 82%, transparent);
-          backdrop-filter: blur(16px) saturate(1.25);
-          -webkit-backdrop-filter: blur(16px) saturate(1.25);
-          border-bottom: 1px solid var(--line);
+          background: color-mix(in srgb, var(--paper) 78%, transparent);
+          backdrop-filter: blur(20px) saturate(1.4);
+          -webkit-backdrop-filter: blur(20px) saturate(1.4);
+          border-bottom: 1px solid transparent;
+          box-shadow: 0 1px 0 rgba(255,255,255,.4) inset, 0 8px 30px -22px rgba(20,12,8,.55);
           overflow: hidden;
         }
+        /* dim the aurora + particle field so it stays a whisper behind the bar */
+        .kdhud-fx { opacity: .42; mix-blend-mode: screen; }
+        .dark .kdhud-fx { opacity: .55; }
+        /* moving iridescent hairline underline */
+        .kdhud-wrap::after {
+          content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px;
+          background: var(--fx-holo); background-size: 300% 100%;
+          opacity: .5; pointer-events: none;
+          animation: kdhudHair 9s linear infinite;
+        }
+        @keyframes kdhudHair { to { background-position: 300% 0; } }
         .is-native .kdhud-wrap { padding-top: env(safe-area-inset-top, 0px); }
         .kdhud-inner {
           height: 50px; display: flex; align-items: center; gap: .7rem;
           width: 100%; max-width: var(--maxw); margin: 0 auto;
-          padding: 0 1.75rem; position: relative;
+          padding: 0 1.75rem; position: relative; z-index: 1;
         }
         .kdhud-spring { flex: 1 1 auto; }
 
@@ -223,72 +248,113 @@ export default function GameHud() {
           transition: transform .16s var(--ease); }
         .kdhud-cluster:hover { transform: translateY(-1px); }
         .kdhud-cluster:active { transform: scale(.97); }
+
+        /* XP ring: holographic stroke with a soft, always-on bloom + crisp neon level */
         .kdhud-ring { position: relative; width: 34px; height: 34px; flex: none; display: grid; place-items: center; }
         .kdhud-ring svg { display: block; }
-        .kdhud-ring-fill { transition: stroke-dashoffset .8s var(--ease); }
+        .kdhud-ring-fill { transition: stroke-dashoffset .8s var(--ease), filter .5s var(--ease);
+          filter: drop-shadow(0 0 3px rgba(var(--fx-amber), .55)) drop-shadow(0 0 6px rgba(var(--fx-magenta), .3)); }
         .kdhud-ring-lvl { position: absolute; inset: 0; display: grid; place-items: center;
           font-size: .74rem; font-weight: 800; color: var(--accent-700);
-          font-variant-numeric: tabular-nums; line-height: 1; }
+          font-variant-numeric: tabular-nums; line-height: 1;
+          text-shadow: 0 0 6px rgba(var(--fx-amber), .5), 0 0 14px rgba(var(--fx-amber), .28); }
+        .dark .kdhud-ring-lvl { color: rgb(var(--fx-gold)); }
         .kdhud-lvl-text { display: flex; flex-direction: column; gap: .22rem; min-width: 0; }
         .kdhud-rank { font-size: .82rem; font-weight: 750; color: var(--ink); letter-spacing: -.005em;
           line-height: 1; white-space: nowrap; }
-        .kdhud-bar-track { width: 84px; height: 4px; border-radius: 999px; background: var(--n-100); overflow: hidden; }
-        .kdhud-bar-fill { display: block; height: 100%; border-radius: 999px;
-          background: linear-gradient(90deg, var(--accent), var(--gold));
-          transition: width .8s var(--ease); }
 
-        /* XP gain flash */
+        /* XP bar: iridescent holo fill + a light sweep passing over the track */
+        .kdhud-bar-track { position: relative; width: 84px; height: 4px; border-radius: 999px;
+          background: color-mix(in srgb, var(--n-100) 82%, transparent); overflow: hidden; }
+        .kdhud-bar-fill { display: block; height: 100%; border-radius: 999px;
+          box-shadow: 0 0 6px rgba(var(--fx-amber), .55);
+          transition: width .8s var(--ease), filter .5s var(--ease); }
+        .kdhud-bar-track.fx-shimmer::after { animation-duration: 4.8s; opacity: .7; }
+
+        /* XP gain flash: pump the bloom, no stroke recolor (stroke is a gradient now) */
         .kdhud-lvl.is-pulse .kdhud-ring-fill { animation: kdhudRingFlash .7s var(--ease); }
         .kdhud-lvl.is-pulse .kdhud-bar-fill { animation: kdhudBarFlash .7s var(--ease); }
         @keyframes kdhudRingFlash {
-          0% { stroke: var(--gold); filter: drop-shadow(0 0 5px rgba(221,154,46,.85)); }
-          100% { stroke: var(--accent); filter: none; }
+          0% { filter: drop-shadow(0 0 8px rgba(var(--fx-gold), .95)) drop-shadow(0 0 16px rgba(var(--fx-magenta), .7)) brightness(1.35); }
+          100% { filter: drop-shadow(0 0 3px rgba(var(--fx-amber), .55)) drop-shadow(0 0 6px rgba(var(--fx-magenta), .3)); }
         }
-        @keyframes kdhudBarFlash { 0% { filter: brightness(1.5); } 100% { filter: none; } }
+        @keyframes kdhudBarFlash {
+          0% { filter: brightness(1.6); box-shadow: 0 0 14px rgba(var(--fx-gold), .95); }
+          100% { filter: none; box-shadow: 0 0 6px rgba(var(--fx-amber), .55); }
+        }
 
         /* Floating +XP */
         .kdhud-float { position: absolute; left: 22px; top: -2px; font-size: .78rem; font-weight: 800;
-          color: var(--gold); font-variant-numeric: tabular-nums; pointer-events: none;
-          text-shadow: 0 1px 6px rgba(221,154,46,.4); animation: kdhudFloat 1.1s var(--ease) forwards; }
+          color: rgb(var(--fx-gold)); font-variant-numeric: tabular-nums; pointer-events: none;
+          text-shadow: 0 0 8px rgba(var(--fx-gold), .7), 0 1px 6px rgba(var(--fx-amber), .5);
+          animation: kdhudFloat 1.1s var(--ease) forwards; }
         @keyframes kdhudFloat { 0% { opacity: 0; transform: translateY(4px) scale(.8); }
           25% { opacity: 1; transform: translateY(-4px) scale(1); }
           100% { opacity: 0; transform: translateY(-20px) scale(1); } }
 
-        /* Chips (flame + sparks) */
-        .kdhud-chip { display: inline-flex; align-items: center; gap: .35rem; padding: .32rem .62rem;
-          border-radius: var(--r-pill); border: 1px solid var(--line); background: var(--paper);
-          text-decoration: none; color: var(--n-600); transition: transform .16s var(--ease), border-color .16s, background .16s; }
-        .kdhud-chip:hover { transform: translateY(-1px); border-color: var(--accent-300); }
+        /* Chips (flame + sparks): glassy energy pills */
+        .kdhud-chip { position: relative; display: inline-flex; align-items: center; gap: .35rem;
+          padding: .32rem .62rem; border-radius: var(--r-pill); overflow: hidden;
+          border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+          background: color-mix(in srgb, var(--paper) 72%, transparent);
+          backdrop-filter: blur(10px) saturate(1.3); -webkit-backdrop-filter: blur(10px) saturate(1.3);
+          text-decoration: none; color: var(--n-600);
+          transition: transform .16s var(--ease), border-color .16s, background .16s, box-shadow .3s var(--ease); }
+        .kdhud-chip:hover { transform: translateY(-1px); border-color: var(--accent-300);
+          box-shadow: 0 0 14px rgba(var(--fx-amber), .3); }
         .kdhud-chip:active { transform: scale(.95); }
         .kdhud-num { font-size: .95rem; font-weight: 800; color: var(--ink); font-variant-numeric: tabular-nums; line-height: 1; }
 
-        /* Flame */
+        /* Flame: plasma glow when lit */
         .kdhud-flame { display: grid; place-items: center; color: var(--n-400); transition: color .2s; }
-        .kdhud-streak.is-lit { background: var(--accent-50); border-color: var(--accent-300); }
-        .kdhud-streak.is-lit .kdhud-flame { color: var(--accent); animation: kdhudFlicker 2.4s ease-in-out infinite; transform-origin: 50% 90%; }
-        .kdhud-streak.is-lit .kdhud-flame svg { fill: color-mix(in srgb, var(--gold) 55%, transparent); }
+        .kdhud-streak.is-lit {
+          background: color-mix(in srgb, var(--accent-50) 78%, transparent);
+          border-color: color-mix(in srgb, var(--fx-amber) 45%, transparent);
+          box-shadow: 0 0 12px rgba(var(--fx-amber), .28), 0 0 0 1px rgba(var(--fx-amber), .1) inset; }
+        .kdhud-streak.is-lit .kdhud-flame { color: rgb(var(--fx-amber));
+          animation: kdhudFlicker 2.4s ease-in-out infinite; transform-origin: 50% 90%; }
+        .kdhud-streak.is-lit .kdhud-flame svg { fill: color-mix(in srgb, rgb(var(--fx-gold)) 60%, transparent); }
         @keyframes kdhudFlicker {
-          0%, 100% { transform: scale(1) rotate(-1deg); filter: drop-shadow(0 0 3px rgba(217,107,67,.5)); }
-          30% { transform: scale(1.06) rotate(1.5deg); filter: drop-shadow(0 0 6px rgba(221,154,46,.7)); }
-          55% { transform: scale(.97) rotate(-1.5deg); filter: drop-shadow(0 0 4px rgba(217,107,67,.55)); }
-          80% { transform: scale(1.03) rotate(1deg); filter: drop-shadow(0 0 7px rgba(221,154,46,.65)); }
+          0%, 100% { transform: scale(1) rotate(-1deg);
+            filter: drop-shadow(0 0 4px rgba(var(--fx-amber), .7)) drop-shadow(0 0 9px rgba(var(--fx-magenta), .35)); }
+          30% { transform: scale(1.07) rotate(1.5deg);
+            filter: drop-shadow(0 0 8px rgba(var(--fx-gold), .95)) drop-shadow(0 0 16px rgba(var(--fx-amber), .55)); }
+          55% { transform: scale(.97) rotate(-1.5deg);
+            filter: drop-shadow(0 0 5px rgba(var(--fx-amber), .75)) drop-shadow(0 0 11px rgba(var(--fx-magenta), .4)); }
+          80% { transform: scale(1.04) rotate(1deg);
+            filter: drop-shadow(0 0 9px rgba(var(--fx-gold), .85)) drop-shadow(0 0 18px rgba(var(--fx-amber), .5)); }
         }
 
-        /* Sparks */
-        .kdhud-sparkle { display: grid; place-items: center; color: var(--gold); }
+        /* Sparks: energy pill, shimmer sweep on change */
+        .kdhud-sparkle { display: grid; place-items: center; color: rgb(var(--fx-gold));
+          filter: drop-shadow(0 0 4px rgba(var(--fx-gold), .5)); }
         .kdhud-sparks .kdhud-num { color: var(--accent-700); }
+        .kdhud-sparks::before { content: ""; position: absolute; inset: 0; pointer-events: none;
+          background: linear-gradient(115deg, transparent 34%, rgba(255,255,255,.6) 50%, transparent 66%);
+          transform: translateX(-140%); opacity: 0; }
+        .kdhud-sparks.is-pop { box-shadow: 0 0 16px rgba(var(--fx-gold), .5); }
+        .kdhud-sparks.is-pop::before { animation: kdhudChipSweep .62s var(--ease); }
         .kdhud-sparks.is-pop .kdhud-sparkle { animation: kdhudSparkPop .6s var(--ease); }
         .kdhud-sparks.is-pop .kdhud-num { animation: kdhudNumPop .6s var(--ease); }
+        @keyframes kdhudChipSweep { 0% { transform: translateX(-140%); opacity: 1; }
+          100% { transform: translateX(140%); opacity: 0; } }
         @keyframes kdhudSparkPop { 0% { transform: scale(1) rotate(0); }
-          40% { transform: scale(1.35) rotate(18deg); filter: drop-shadow(0 0 8px rgba(221,154,46,.9)); }
-          100% { transform: scale(1) rotate(0); } }
-        @keyframes kdhudNumPop { 0% { transform: scale(1); } 45% { transform: scale(1.22); color: var(--gold); } 100% { transform: scale(1); } }
+          40% { transform: scale(1.4) rotate(18deg); filter: drop-shadow(0 0 10px rgba(var(--fx-gold), 1)); }
+          100% { transform: scale(1) rotate(0); filter: drop-shadow(0 0 4px rgba(var(--fx-gold), .5)); } }
+        @keyframes kdhudNumPop { 0% { transform: scale(1); }
+          45% { transform: scale(1.22); color: rgb(var(--fx-gold)); } 100% { transform: scale(1); } }
 
-        /* Level-up sweep across the whole bar */
-        .kdhud-sweep { position: absolute; inset: 0; pointer-events: none;
-          background: linear-gradient(105deg, transparent 20%,
-            color-mix(in srgb, var(--gold) 42%, transparent) 48%,
-            color-mix(in srgb, var(--accent-300) 40%, transparent) 56%, transparent 82%);
+        /* Level-up: intense holographic light-bar swept across the whole HUD */
+        .kdhud-sweep { position: absolute; inset: 0; z-index: 2; pointer-events: none; mix-blend-mode: screen;
+          background: linear-gradient(105deg,
+            transparent 18%,
+            rgba(var(--fx-amber), .5) 40%,
+            rgba(var(--fx-gold), .85) 48%,
+            rgba(var(--fx-magenta), .6) 54%,
+            rgba(var(--fx-violet), .5) 60%,
+            rgba(var(--fx-cyan), .4) 66%,
+            transparent 84%);
+          filter: blur(1px);
           transform: translateX(-120%); animation: kdhudSweep 1.15s var(--ease) forwards; }
         @keyframes kdhudSweep { 0% { transform: translateX(-120%); opacity: 0; }
           20% { opacity: 1; } 100% { transform: translateX(120%); opacity: 0; } }
@@ -306,11 +372,13 @@ export default function GameHud() {
         @media (prefers-reduced-motion: reduce) {
           .kdhud-ring-fill, .kdhud-bar-fill { transition: none !important; }
           .kdhud-cluster, .kdhud-chip { transition: none !important; }
+          .kdhud-wrap::after { animation: none !important; }
           .kdhud-lvl.is-pulse .kdhud-ring-fill,
           .kdhud-lvl.is-pulse .kdhud-bar-fill,
           .kdhud-streak.is-lit .kdhud-flame,
           .kdhud-sparks.is-pop .kdhud-sparkle,
           .kdhud-sparks.is-pop .kdhud-num,
+          .kdhud-sparks.is-pop::before,
           .kdhud-float, .kdhud-sweep { animation: none !important; }
         }
       `}</style>

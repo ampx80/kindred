@@ -1,0 +1,210 @@
+/* ===========================================================================
+   Kindred FX: a warm-holographic, futuristic visual language for the whole
+   engagement layer. This is intentionally NOT cold sci-fi: it fuses the app's
+   warm paper/amber brand with iridescent holo sheen, glass, neon glow, moving
+   auroras, light sweeps, conic borders, and subtle depth so the game surfaces
+   feel alive and mind-bending while still feeling like Kindred.
+
+   Everything is opt-in via .fx-* classes and every animation is disabled under
+   prefers-reduced-motion. Use a unique fx- prefix so nothing collides.
+   =========================================================================== */
+
+:root {
+  /* Warm-neon holographic palette (blends brand amber with iridescence).
+     Triplets are comma-separated so both rgb(var(--x)) and rgba(var(--x), a)
+     are valid. */
+  --fx-amber: 250,138,74;      /* warm brand core */
+  --fx-gold: 245,190,110;
+  --fx-magenta: 233,120,160;
+  --fx-violet: 150,130,245;
+  --fx-cyan: 110,205,220;
+  --fx-teal: 120,200,170;
+
+  --fx-glow: 250,138,74;       /* default glow color (rgb triplet) */
+  --fx-ink: 40,28,22;
+  --fx-glass: 255,255,255;     /* glass tint base (light) */
+  --fx-glass-a: 0.55;          /* glass alpha (light) */
+  --fx-line: 255,255,255;
+  --fx-hairline: 0.5;
+
+  --fx-holo: linear-gradient(
+    100deg,
+    rgb(var(--fx-amber)) 0%,
+    rgb(var(--fx-gold)) 20%,
+    rgb(var(--fx-magenta)) 42%,
+    rgb(var(--fx-violet)) 62%,
+    rgb(var(--fx-cyan)) 82%,
+    rgb(var(--fx-amber)) 100%
+  );
+  --fx-ease: cubic-bezier(.22, 1, .36, .68);
+}
+
+.dark {
+  --fx-glass: 30,24,22;
+  --fx-glass-a: 0.5;
+  --fx-line: 255,236,214;
+  --fx-hairline: 0.14;
+  --fx-ink: 248,240,232;
+}
+
+/* ---------- GLASS ---------------------------------------------------------- */
+.fx-glass {
+  background: rgba(var(--fx-glass), var(--fx-glass-a));
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  backdrop-filter: blur(18px) saturate(150%);
+  border: 1px solid rgba(var(--fx-line), calc(var(--fx-hairline) + 0.25));
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, .35) inset,
+    0 18px 50px -18px rgba(20, 12, 8, .45),
+    0 0 0 1px rgba(var(--fx-glow), .05);
+}
+.fx-glass-deep {
+  background: rgba(var(--fx-glass), calc(var(--fx-glass-a) + 0.18));
+  -webkit-backdrop-filter: blur(30px) saturate(160%);
+  backdrop-filter: blur(30px) saturate(160%);
+  border: 1px solid rgba(var(--fx-line), calc(var(--fx-hairline) + 0.3));
+}
+
+/* ---------- HOLOGRAPHIC TEXT + FILL --------------------------------------- */
+.fx-holo-text {
+  background: var(--fx-holo);
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: fx-holo-shift 6s linear infinite;
+}
+.fx-holo-fill {
+  background: var(--fx-holo);
+  background-size: 300% 100%;
+  animation: fx-holo-shift 6s linear infinite;
+}
+
+/* ---------- NEON GLOW ------------------------------------------------------ */
+.fx-neon {
+  box-shadow:
+    0 0 0 1px rgba(var(--fx-glow), .35),
+    0 0 12px rgba(var(--fx-glow), .35),
+    0 0 34px rgba(var(--fx-glow), .22);
+}
+.fx-neon-breathe { animation: fx-glow-breath 3.4s var(--fx-ease) infinite; }
+.fx-neon-text {
+  text-shadow:
+    0 0 8px rgba(var(--fx-glow), .55),
+    0 0 22px rgba(var(--fx-glow), .3);
+}
+
+/* ---------- ROTATING CONIC BORDER ----------------------------------------- */
+/* Put on a positioned element; draws an animated iridescent ring behind it. */
+.fx-ring { position: relative; z-index: 0; }
+.fx-ring::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  padding: 2px;
+  background: conic-gradient(
+    from 0deg,
+    rgb(var(--fx-amber)), rgb(var(--fx-magenta)), rgb(var(--fx-violet)),
+    rgb(var(--fx-cyan)), rgb(var(--fx-gold)), rgb(var(--fx-amber))
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: fx-spin 5s linear infinite;
+  opacity: .9;
+  z-index: -1;
+}
+
+/* ---------- AURORA / MESH BACKDROP ---------------------------------------- */
+.fx-aurora {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background:
+    radial-gradient(45% 55% at 18% 22%, rgba(var(--fx-amber), .55), transparent 60%),
+    radial-gradient(40% 50% at 82% 18%, rgba(var(--fx-magenta), .45), transparent 60%),
+    radial-gradient(55% 60% at 72% 82%, rgba(var(--fx-violet), .45), transparent 62%),
+    radial-gradient(45% 55% at 28% 88%, rgba(var(--fx-cyan), .4), transparent 60%);
+  background-size: 180% 180%;
+  filter: blur(6px) saturate(130%);
+  animation: fx-aurora-drift 18s ease-in-out infinite alternate;
+}
+
+/* ---------- SYNTH GRID FLOOR ---------------------------------------------- */
+.fx-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(var(--fx-glow), .18) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--fx-glow), .12) 1px, transparent 1px);
+  background-size: 34px 34px;
+  -webkit-mask-image: radial-gradient(120% 80% at 50% 0%, #000 30%, transparent 78%);
+  mask-image: radial-gradient(120% 80% at 50% 0%, #000 30%, transparent 78%);
+  animation: fx-grid-scroll 8s linear infinite;
+}
+
+/* ---------- LIGHT SWEEP / SHIMMER ----------------------------------------- */
+.fx-shimmer { position: relative; overflow: hidden; }
+.fx-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, .55) 50%, transparent 70%);
+  transform: translateX(-120%);
+  animation: fx-sweep 3.6s var(--fx-ease) infinite;
+  pointer-events: none;
+}
+
+/* ---------- SCANLINE ------------------------------------------------------- */
+.fx-scan { position: relative; overflow: hidden; }
+.fx-scan::before {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  height: 32%;
+  background: linear-gradient(180deg, rgba(var(--fx-glow), .22), transparent);
+  animation: fx-scanline 3.2s var(--fx-ease) infinite;
+  pointer-events: none;
+}
+
+/* ---------- DEPTH / FLOAT / ENTRANCE -------------------------------------- */
+.fx-float { animation: fx-float 6s ease-in-out infinite; }
+.fx-pop-in { animation: fx-pop 620ms var(--fx-ease) both; }
+.fx-rise-in { animation: fx-rise 560ms var(--fx-ease) both; }
+.fx-tilt { transition: transform .25s var(--fx-ease); transform-style: preserve-3d; }
+.fx-tilt:hover { transform: perspective(700px) rotateX(4deg) rotateY(-4deg) translateZ(6px); }
+
+/* ---------- KEYFRAMES ------------------------------------------------------ */
+@keyframes fx-holo-shift { to { background-position: 300% 0; } }
+@keyframes fx-spin { to { transform: rotate(360deg); } }
+@keyframes fx-glow-breath {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(var(--fx-glow), .3), 0 0 10px rgba(var(--fx-glow), .28), 0 0 26px rgba(var(--fx-glow), .16); }
+  50% { box-shadow: 0 0 0 1px rgba(var(--fx-glow), .5), 0 0 20px rgba(var(--fx-glow), .5), 0 0 52px rgba(var(--fx-glow), .3); }
+}
+@keyframes fx-aurora-drift {
+  0% { background-position: 0% 0%; }
+  50% { background-position: 100% 60%; }
+  100% { background-position: 20% 100%; }
+}
+@keyframes fx-grid-scroll { to { background-position: 0 34px, 34px 0; } }
+@keyframes fx-sweep { 0% { transform: translateX(-120%); } 55%, 100% { transform: translateX(120%); } }
+@keyframes fx-scanline { 0% { transform: translateY(-110%); } 100% { transform: translateY(340%); } }
+@keyframes fx-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@keyframes fx-pop { 0% { opacity: 0; transform: scale(.82); } 60% { opacity: 1; transform: scale(1.04); } 100% { transform: scale(1); } }
+@keyframes fx-rise { 0% { opacity: 0; transform: translateY(16px); } 100% { opacity: 1; transform: translateY(0); } }
+
+/* ---------- REDUCED MOTION ------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .fx-holo-text, .fx-holo-fill, .fx-neon-breathe, .fx-aurora, .fx-grid,
+  .fx-shimmer::after, .fx-scan::before, .fx-float, .fx-pop-in, .fx-rise-in,
+  .fx-ring::before {
+    animation: none !important;
+  }
+  .fx-shimmer::after, .fx-scan::before { display: none; }
+  .fx-tilt:hover { transform: none; }
+}

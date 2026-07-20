@@ -14,8 +14,19 @@ import { celebrate } from '../lib/celebrate.js';
 import { track } from '../lib/track.js';
 import { useGame } from '../lib/game.js';
 import { ACHIEVEMENTS, RARITY } from '../lib/gameContent.js';
+import FxBackdrop from '../components/FxBackdrop.jsx';
 
 const RARITY_ORDER = ['common', 'rare', 'epic', 'legendary'];
+
+// Maps each rarity to a warm-holo glow triplet from the global FX palette. Fed
+// into --fx-glow per tile so the neon glow matches the rarity color without
+// touching the RARITY color logic that drives borders + labels.
+const RARITY_GLOW = {
+  common: 'var(--fx-teal)',
+  rare: 'var(--fx-cyan)',
+  epic: 'var(--fx-amber)',
+  legendary: 'var(--fx-gold)',
+};
 
 const fmtDate = (iso) => {
   if (!iso) return '';
@@ -141,12 +152,13 @@ export default function Achievements() {
     <div className="ach-page">
       <AchStyles />
 
-      <header className="ach-head">
+      <header className="ach-head fx-glass">
+        <FxBackdrop glow="245,190,110" density={30} style={{ opacity: 0.55 }} />
         <div className="row gap-2" style={{ alignItems: 'center', minWidth: 0 }}>
-          <span className="aria-orb ach-orb" aria-hidden />
+          <span className="aria-orb ach-orb fx-float" aria-hidden />
           <div className="col" style={{ gap: '.2rem', minWidth: 0 }}>
             <span className="eyebrow">Your collection</span>
-            <h1 className="serif" style={{ margin: 0, lineHeight: 1.1 }}>Achievements</h1>
+            <h1 className="serif fx-holo-text ach-title" style={{ margin: 0, lineHeight: 1.1 }}>Achievements</h1>
             <span className="muted t-sm clip">
               {complete
                 ? 'Every last one. The whole wall is yours.'
@@ -203,14 +215,15 @@ export default function Achievements() {
       </div>
 
       <div className="ach-grid">
-        {visible.map(a => {
+        {visible.map((a, i) => {
           const meta = RARITY[a.rarity] || RARITY.common;
           const at = unlocked[a.id];
           const isUnlocked = !!at;
           const legendary = a.rarity === 'legendary';
+          const delay = { animationDelay: `${Math.min(i, 14) * 0.04}s` };
           if (!isUnlocked) {
             return (
-              <div key={a.id} className="ach-tile is-locked" aria-label={`${a.name}, locked`}>
+              <div key={a.id} className="ach-tile is-locked fx-glass fx-rise-in" style={delay} aria-label={`${a.name}, locked`}>
                 <span className="ach-lock" aria-hidden><LockGlyph size={14} /></span>
                 <span className="ach-ic ach-ic-locked" aria-hidden><Icon name={a.icon} size={24} /></span>
                 <div className="col" style={{ gap: '.25rem', minWidth: 0 }}>
@@ -223,11 +236,12 @@ export default function Achievements() {
           }
           return (
             <button key={a.id}
-              className={`ach-tile is-unlocked${legendary ? ' is-legendary' : ''}`}
-              style={{ '--tint': meta.color, '--tint-bg': meta.bg }}
+              className={`ach-tile is-unlocked fx-glass fx-tilt fx-rise-in${legendary ? ' is-legendary fx-ring' : ''}`}
+              style={{ '--tint': meta.color, '--tint-bg': meta.bg, '--fx-glow': RARITY_GLOW[a.rarity] || 'var(--fx-amber)', ...delay }}
               onClick={() => share(a)}
               aria-label={`${a.name}, unlocked ${fmtDate(at)}. Tap to share.`}>
-              {legendary && <span className="ach-shine" aria-hidden />}
+              {legendary && <span className="ach-scan" aria-hidden />}
+              <span className="ach-sweep" aria-hidden />
               <span className="ach-ic" aria-hidden><Icon name={a.icon} size={24} /></span>
               <div className="col" style={{ gap: '.25rem', minWidth: 0 }}>
                 <span className="fw-7 clip">{a.name}</span>
@@ -276,12 +290,22 @@ function AchStyles() {
       }
       @keyframes achEnter { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 
-      /* Header */
-      .ach-head { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap; }
+      /* Header - warm glass slab with a light aurora behind the content */
+      .ach-head { position: relative; overflow: hidden; isolation: isolate;
+        display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap;
+        padding: 1.4rem 1.6rem; border-radius: var(--r-md); }
+      .ach-head > *:not(.fx-backdrop) { position: relative; z-index: 1; }
       .ach-orb { width: 46px; height: 46px; flex: none; }
+      .ach-title { background-size: 220% 100%; letter-spacing: -.01em;
+        filter: drop-shadow(0 1px 10px rgba(var(--fx-gold), .35)); }
       .ach-head-ring { display: flex; align-items: center; gap: 1.1rem; flex-wrap: wrap; }
 
       .ach-ring { position: relative; flex: none; }
+      /* Soft holo halo bloom behind the progress ring */
+      .ach-ring::after { content: ""; position: absolute; inset: -14px; border-radius: 50%; z-index: -1;
+        background: radial-gradient(circle at 50% 50%, rgba(var(--fx-gold), .5), rgba(var(--fx-amber), .18) 55%, transparent 72%);
+        filter: blur(6px); animation: achHalo 4.2s ease-in-out infinite; }
+      @keyframes achHalo { 0%,100% { opacity: .55; transform: scale(.97); } 50% { opacity: 1; transform: scale(1.04); } }
       .ach-ring-label { position: absolute; inset: 0; gap: 0; }
       .ach-ring-num { font-size: 2.1rem; font-weight: 800; line-height: 1; color: var(--ink); }
 
@@ -291,13 +315,19 @@ function AchStyles() {
       .ach-brk-label { color: var(--n-600); }
       .ach-brk-count { font-weight: 800; margin-left: .1rem; }
 
-      /* 100% banner */
-      .ach-banner { display: flex; align-items: center; gap: .9rem; padding: 1rem 1.2rem;
-        border-radius: var(--r-md); border: 1px solid var(--gold);
-        background: linear-gradient(135deg, var(--gold-bg), var(--paper));
-        box-shadow: var(--shadow-sm); }
+      /* 100% banner - a gold holo slab with a light sweep */
+      .ach-banner { position: relative; overflow: hidden; display: flex; align-items: center; gap: .9rem; padding: 1rem 1.2rem;
+        border-radius: var(--r-md); border: 1px solid rgba(var(--fx-gold), .6);
+        background: linear-gradient(135deg, rgba(var(--fx-gold), .28), var(--gold-bg) 45%, var(--paper));
+        box-shadow: 0 1px 0 rgba(255,255,255,.5) inset, 0 12px 34px -16px rgba(20,12,8,.4), 0 0 26px rgba(var(--fx-gold), .3); }
+      .ach-banner::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+        background: linear-gradient(115deg, transparent 34%, rgba(255,255,255,.5) 50%, transparent 66%);
+        transform: translateX(-130%); animation: achSweep 4.4s var(--fx-ease) infinite; }
+      .ach-banner > * { position: relative; z-index: 1; }
       .ach-banner-ic { width: 48px; height: 48px; border-radius: 14px; flex: none; display: grid; place-items: center;
-        background: var(--gold-bg); color: var(--gold); animation: achFloat 3s ease-in-out infinite; }
+        background: linear-gradient(150deg, rgba(255,255,255,.6), var(--gold-bg)); color: var(--gold);
+        box-shadow: inset 0 0 0 1.5px rgba(var(--fx-gold), .5), 0 0 18px rgba(var(--fx-gold), .4);
+        animation: achFloat 3s ease-in-out infinite; }
       @keyframes achFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
 
       /* Filter chips */
@@ -320,17 +350,38 @@ function AchStyles() {
         padding: 1.15rem; border-radius: var(--r-md); border: 1px solid var(--line);
         background: var(--paper); }
 
-      /* Unlocked - vivid, tinted by rarity */
-      .ach-tile.is-unlocked { cursor: pointer; border-color: var(--tint);
-        background: linear-gradient(150deg, var(--tint-bg), var(--paper) 78%);
-        box-shadow: var(--shadow-sm);
-        transition: transform .18s var(--ease), box-shadow .18s var(--ease); }
-      .ach-tile.is-unlocked:hover { transform: translateY(-4px); box-shadow: var(--shadow-md); }
-      .ach-tile.is-unlocked:active { transform: translateY(-1px) scale(.99); }
+      /* Unlocked - a glass holo-badge, tinted + neon-glowed by rarity */
+      .ach-tile.is-unlocked { cursor: pointer; overflow: visible; border-color: var(--tint);
+        transform-style: preserve-3d; will-change: transform;
+        background:
+          linear-gradient(150deg, rgba(var(--fx-glow), .16), var(--tint-bg) 52%, rgba(var(--fx-glass), calc(var(--fx-glass-a) - .1)) 100%);
+        box-shadow:
+          0 1px 0 rgba(255,255,255,.45) inset,
+          0 12px 34px -16px rgba(20,12,8,.42),
+          0 0 0 1px rgba(var(--fx-glow), .3),
+          0 0 20px rgba(var(--fx-glow), .26);
+        transition: transform .25s var(--fx-ease), box-shadow .25s var(--fx-ease); }
+      .ach-tile.is-unlocked:hover {
+        transform: perspective(820px) translateY(-4px) rotateX(3.5deg) rotateY(-3.5deg) translateZ(10px);
+        box-shadow:
+          0 1px 0 rgba(255,255,255,.55) inset,
+          0 22px 46px -18px rgba(20,12,8,.5),
+          0 0 0 1px rgba(var(--fx-glow), .5),
+          0 0 34px rgba(var(--fx-glow), .45); }
+      .ach-tile.is-unlocked:active { transform: perspective(820px) translateY(-1px) scale(.99); }
       .ach-tile.is-unlocked:focus-visible { outline: 2px solid var(--tint); outline-offset: 2px; }
 
-      .ach-ic { width: 46px; height: 46px; border-radius: 14px; flex: none; display: grid; place-items: center;
-        background: var(--paper); color: var(--tint); box-shadow: inset 0 0 0 1.5px var(--tint); }
+      /* Light sweep across every unlocked badge */
+      .ach-sweep { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; pointer-events: none; }
+      .ach-sweep::after { content: ""; position: absolute; inset: 0;
+        background: linear-gradient(115deg, transparent 34%, rgba(255,255,255,.5) 50%, transparent 66%);
+        transform: translateX(-130%); animation: achSweep 4.4s var(--fx-ease) infinite; }
+      @keyframes achSweep { 0% { transform: translateX(-130%); } 58%, 100% { transform: translateX(130%); } }
+
+      .ach-ic { position: relative; width: 46px; height: 46px; border-radius: 14px; flex: none; display: grid; place-items: center;
+        background: linear-gradient(150deg, rgba(255,255,255,.55), rgba(var(--fx-glow), .1));
+        color: var(--tint);
+        box-shadow: inset 0 0 0 1.5px var(--tint), inset 0 1px 0 rgba(255,255,255,.5), 0 0 16px rgba(var(--fx-glow), .3); }
       .ach-ic-locked { background: var(--n-50); color: var(--n-400); box-shadow: none; }
       .ach-desc { line-height: 1.4; }
 
@@ -346,18 +397,38 @@ function AchStyles() {
       .ach-tile.is-unlocked:hover .ach-share-hint,
       .ach-tile.is-unlocked:focus-visible .ach-share-hint { opacity: 1; transform: none; }
 
-      /* Legendary shimmer */
-      .ach-tile.is-legendary { border-width: 1.5px; }
-      .ach-shine { position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
-        background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,.55) 48%, transparent 62%);
-        background-size: 250% 100%; animation: achShine 4.5s ease-in-out infinite; }
-      @keyframes achShine { 0% { background-position: 150% 0; } 55%,100% { background-position: -80% 0; } }
+      /* Legendary - rotating holo ring, stronger sheen, faint scanline */
+      .ach-tile.is-legendary { border-width: 1.5px; border-color: transparent; }
+      .ach-tile.is-legendary::after { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none;
+        background: var(--fx-holo); background-size: 300% 100%; opacity: .18; mix-blend-mode: screen;
+        animation: achLegendSheen 6s linear infinite; }
+      @keyframes achLegendSheen { to { background-position: 300% 0; } }
+      .ach-tile.is-legendary { animation: fx-rise 560ms var(--fx-ease) both, achLegendBreath 3.8s var(--fx-ease) infinite; }
+      @keyframes achLegendBreath {
+        0%,100% { box-shadow: 0 1px 0 rgba(255,255,255,.45) inset, 0 12px 34px -16px rgba(20,12,8,.42), 0 0 0 1px rgba(var(--fx-glow), .32), 0 0 20px rgba(var(--fx-glow), .3); }
+        50% { box-shadow: 0 1px 0 rgba(255,255,255,.55) inset, 0 14px 38px -16px rgba(20,12,8,.46), 0 0 0 1px rgba(var(--fx-glow), .55), 0 0 40px rgba(var(--fx-glow), .5); }
+      }
+      /* Faint scanline drifting down legendary badges */
+      .ach-scan { position: absolute; inset: 0; z-index: -1; border-radius: inherit; overflow: hidden; pointer-events: none; }
+      .ach-scan::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 34%;
+        background: linear-gradient(180deg, rgba(var(--fx-glow), .28), transparent);
+        animation: achScan 3.6s var(--fx-ease) infinite; }
+      @keyframes achScan { 0% { transform: translateY(-120%); } 100% { transform: translateY(320%); } }
 
-      /* Locked - muted, greyscale */
-      .ach-tile.is-locked { filter: grayscale(1); opacity: .72; }
+      /* Locked - dim frosted glass with a crystalline lock */
+      .ach-tile.is-locked { overflow: hidden; opacity: .82; border-color: rgba(var(--fx-line), calc(var(--fx-hairline) + .2));
+        background: linear-gradient(150deg, rgba(var(--fx-glass), calc(var(--fx-glass-a) + .1)), rgba(var(--fx-glass), calc(var(--fx-glass-a) - .05)));
+        filter: saturate(.55); }
+      .ach-tile.is-locked .ach-ic-locked { color: var(--n-400); }
       .ach-tile.is-locked .fw-7 { color: var(--n-600); }
-      .ach-lock { position: absolute; top: .85rem; right: .85rem; display: grid; place-items: center;
-        width: 26px; height: 26px; border-radius: 50%; background: var(--n-50); color: var(--n-500); border: 1px solid var(--line); }
+      .ach-lock { position: absolute; top: .85rem; right: .85rem; z-index: 1; display: grid; place-items: center;
+        width: 28px; height: 28px; border-radius: 9px; color: var(--n-500);
+        background: linear-gradient(135deg, rgba(255,255,255,.7), rgba(var(--fx-violet), .14) 60%, rgba(var(--fx-cyan), .16));
+        border: 1px solid rgba(var(--fx-line), calc(var(--fx-hairline) + .3));
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.6), inset 0 -6px 10px -6px rgba(var(--fx-violet), .4), 0 2px 6px -3px rgba(20,12,8,.4); }
+      /* Crystalline facet glint across the lock */
+      .ach-lock::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+        background: linear-gradient(130deg, transparent 42%, rgba(255,255,255,.7) 50%, transparent 58%); }
 
       .ach-empty { padding: 3rem 1.5rem; border: 1px dashed var(--line); border-radius: var(--r-md); text-align: center; }
       .ach-foot { padding-top: .3rem; }
@@ -369,9 +440,11 @@ function AchStyles() {
       }
 
       @media (prefers-reduced-motion: reduce) {
-        .ach-page > *, .ach-banner-ic, .ach-shine, .ach-chip, .ach-chip:hover, .ach-chip:active,
-        .ach-tile.is-unlocked, .ach-tile.is-unlocked:hover, .ach-share-hint { animation: none !important; transition: none !important; transform: none !important; }
-        .ach-shine { display: none; }
+        .ach-page > *, .ach-banner-ic, .ach-chip, .ach-chip:hover, .ach-chip:active,
+        .ach-tile, .ach-tile.is-unlocked, .ach-tile.is-unlocked:hover,
+        .ach-tile.is-legendary, .ach-tile.is-legendary::after, .ach-ring::after,
+        .ach-share-hint { animation: none !important; transition: none !important; transform: none !important; }
+        .ach-sweep, .ach-scan, .ach-banner::after { display: none !important; }
       }
     `}</style>
   );

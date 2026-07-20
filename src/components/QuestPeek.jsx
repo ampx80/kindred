@@ -5,7 +5,7 @@
 // quest offers a glowing Claim button, a claimed one shows a check. Lives at
 // bottom-left on desktop (clear of the 260px rail and the bottom-right AriaDock)
 // and just above the tab bar on mobile. Remembers its open state.
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useId } from 'react';
 import { Link } from 'react-router-dom';
 import { Icon } from './icons.jsx';
 import { useToast } from './UI.jsx';
@@ -18,14 +18,28 @@ import { celebrate, burstFrom } from '../lib/celebrate.js';
 
 const OPEN_KEY = 'kindred_questpeek_open';
 
-function QpkRing({ value = 0, size = 30, stroke = 4, color = 'var(--accent-600)' }) {
+function QpkRing({ value = 0, size = 30, stroke = 4, color = 'var(--accent-600)', holo = true }) {
+  const uid = useId().replace(/[:]/g, '');
+  const gid = `qpkHolo-${uid}`;
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
   const off = c * (1 - Math.max(0, Math.min(1, value)));
+  const paint = holo ? `url(#${gid})` : color;
   return (
     <svg className="qpk-ring" width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden>
+      {holo && (
+        <defs>
+          <linearGradient id={gid} x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="rgb(var(--fx-amber))" />
+            <stop offset="30%" stopColor="rgb(var(--fx-gold))" />
+            <stop offset="55%" stopColor="rgb(var(--fx-magenta))" />
+            <stop offset="78%" stopColor="rgb(var(--fx-violet))" />
+            <stop offset="100%" stopColor="rgb(var(--fx-cyan))" />
+          </linearGradient>
+        </defs>
+      )}
       <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--line)" strokeWidth={stroke} />
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round"
+      <circle className="qpk-ring__prog" cx={size / 2} cy={size / 2} r={r} fill="none" stroke={paint} strokeWidth={stroke} strokeLinecap="round"
         strokeDasharray={c} strokeDashoffset={off} transform={`rotate(-90 ${size / 2} ${size / 2})`} />
     </svg>
   );
@@ -89,7 +103,8 @@ export default function QuestPeek() {
   return (
     <div className="qpk">
       {open ? (
-        <div className="qpk-panel" role="dialog" aria-label="Today's quests">
+        <div className="qpk-panel fx-glass-deep" role="dialog" aria-label="Today's quests">
+          <span className="qpk-aurora fx-aurora" aria-hidden />
           <button className="qpk-panel__head" onClick={toggle} aria-label="Collapse quests">
             <QpkRing value={total ? done / total : 0} size={34} stroke={4} color={ringColor} />
             <span className="qpk-panel__meta">
@@ -114,14 +129,14 @@ export default function QuestPeek() {
                       </span>
                     </div>
                     <div className="qpk-bar" role="progressbar" aria-valuemin={0} aria-valuemax={def.target} aria-valuenow={Math.min(def.target, row.progress)}>
-                      <span className="qpk-bar__fill" style={{ width: `${row.done ? 100 : pct}%` }} />
+                      <span className="qpk-bar__fill fx-holo-fill" style={{ width: `${row.done ? 100 : pct}%` }} />
                     </div>
                   </div>
                   <div className="qpk-row__end">
                     {row.claimed ? (
                       <span className="qpk-check" aria-label="Claimed"><Icon name="check" size={15} /></span>
                     ) : row.done ? (
-                      <button className="qpk-claim" onClick={(e) => onClaim(e, row.id)}>Claim</button>
+                      <button className="qpk-claim fx-glass" onClick={(e) => onClaim(e, row.id)}><span className="qpk-claim__lbl">Claim</span></button>
                     ) : (
                       <span className="qpk-prog t-xs muted">{Math.min(def.target, row.progress)}/{def.target}</span>
                     )}
@@ -136,7 +151,7 @@ export default function QuestPeek() {
           </Link>
         </div>
       ) : (
-        <button className={`qpk-pill${pulse ? ' is-pulse' : ''}${allDone ? ' is-done' : ''}`} onClick={toggle} aria-label={`${done} of ${total} quests done today, open tracker`}>
+        <button className={`qpk-pill fx-glass${pulse ? ' is-pulse' : ''}${allDone ? ' is-done' : ''}${claimable > 0 ? ' fx-ring is-hot' : ''}`} onClick={toggle} aria-label={`${done} of ${total} quests done today, open tracker`}>
           <span className="qpk-pill__ring">
             <QpkRing value={total ? done / total : 0} size={28} stroke={3.5} color={ringColor} />
             {claimable > 0 && <span className="qpk-pill__dot" aria-hidden />}
@@ -151,74 +166,108 @@ export default function QuestPeek() {
       <style>{`
         .qpk { position: fixed; left: 280px; bottom: 20px; z-index: 55; }
 
-        /* ---- collapsed pill ---- */
-        .qpk-pill { display: inline-flex; align-items: center; gap: .55rem; padding: .4rem .8rem .4rem .45rem;
-          background: var(--paper); border: 1px solid var(--line); border-radius: 999px; cursor: pointer;
-          font-family: inherit; color: var(--ink); box-shadow: 0 12px 30px -14px rgba(70,50,35,.5), 0 1px 2px rgba(70,50,35,.05);
-          transition: transform .18s cubic-bezier(.22,1,.36,1), box-shadow .18s, border-color .18s; }
-        .qpk-pill:hover { transform: translateY(-2px); box-shadow: 0 18px 40px -14px rgba(70,50,35,.55); border-color: var(--accent-300); }
+        /* ---- collapsed pill: a glowing holographic objectives token ---- */
+        .qpk-pill { position: relative; display: inline-flex; align-items: center; gap: .55rem; padding: .4rem .85rem .4rem .48rem;
+          border-radius: 999px; cursor: pointer; font-family: inherit; color: var(--ink);
+          box-shadow: 0 14px 34px -16px rgba(70,50,35,.55), 0 0 0 1px rgba(var(--fx-glow), .06),
+            0 0 18px -4px rgba(var(--fx-glow), .28);
+          transition: transform .18s cubic-bezier(.22,1,.36,1), box-shadow .3s, border-color .18s;
+          animation: qpkTokenGlow 4.2s var(--fx-ease, cubic-bezier(.22,1,.36,.68)) infinite; }
+        .qpk-pill:hover { transform: translateY(-2px);
+          box-shadow: 0 20px 44px -16px rgba(70,50,35,.6), 0 0 0 1px rgba(var(--fx-glow), .12),
+            0 0 26px -2px rgba(var(--fx-glow), .42); }
         .qpk-pill:active { transform: translateY(0) scale(.97); }
-        .qpk-pill.is-done { border-color: var(--gold); background: var(--gold-bg); }
+        .qpk-pill.is-done { --fx-glow: var(--fx-goldrgb, 245,190,110); }
+        .qpk-pill.is-hot { --fx-glow: 250,138,74; animation: qpkTokenHot 1.7s ease-in-out infinite; }
+
         .qpk-pill__ring { position: relative; display: grid; place-items: center; flex: none; }
+        .qpk-pill__ring .qpk-ring { filter: drop-shadow(0 0 5px rgba(var(--fx-glow), .5)); }
         .qpk-pill__dot { position: absolute; top: -1px; right: -1px; width: 9px; height: 9px; border-radius: 50%;
-          background: var(--gold); border: 2px solid var(--paper); box-shadow: 0 0 0 0 rgba(221,154,46,.6); animation: qpkDot 1.8s ease-out infinite; }
+          background: rgb(var(--fx-amber)); border: 2px solid rgba(var(--fx-glass), .9);
+          box-shadow: 0 0 0 0 rgba(var(--fx-amber), .6), 0 0 8px rgba(var(--fx-amber), .8); animation: qpkDot 1.8s ease-out infinite; }
         .qpk-pill__text { display: flex; flex-direction: column; line-height: 1.05; }
         .qpk-pill__text .fw-7 { font-size: .95rem; font-variant-numeric: tabular-nums; color: var(--ink); }
-        .qpk-pill__label { color: var(--n-500, var(--n-600)); letter-spacing: .02em; }
+        .qpk-pill__label { color: var(--n-500, var(--n-600)); letter-spacing: .06em; text-transform: uppercase; font-size: .62rem; }
         .qpk-pill.is-pulse { animation: qpkPulse 1.4s ease-in-out; }
-        @keyframes qpkPulse { 0%,100% { box-shadow: 0 12px 30px -14px rgba(70,50,35,.5), 0 0 0 0 rgba(221,154,46,0); }
-          40% { box-shadow: 0 14px 34px -14px rgba(70,50,35,.5), 0 0 0 7px rgba(221,154,46,.18); } }
-        @keyframes qpkDot { 0% { box-shadow: 0 0 0 0 rgba(221,154,46,.6); } 70%,100% { box-shadow: 0 0 0 7px rgba(221,154,46,0); } }
+        @keyframes qpkTokenGlow {
+          0%,100% { box-shadow: 0 14px 34px -16px rgba(70,50,35,.55), 0 0 0 1px rgba(var(--fx-glow), .06), 0 0 16px -6px rgba(var(--fx-glow), .24); }
+          50% { box-shadow: 0 16px 38px -16px rgba(70,50,35,.55), 0 0 0 1px rgba(var(--fx-glow), .12), 0 0 28px -2px rgba(var(--fx-glow), .46); } }
+        @keyframes qpkTokenHot {
+          0%,100% { box-shadow: 0 14px 34px -16px rgba(70,50,35,.55), 0 0 0 1px rgba(var(--fx-glow), .3), 0 0 22px -2px rgba(var(--fx-glow), .5); }
+          50% { box-shadow: 0 16px 40px -16px rgba(70,50,35,.55), 0 0 0 2px rgba(var(--fx-glow), .5), 0 0 40px 2px rgba(var(--fx-glow), .78); } }
+        @keyframes qpkPulse { 0%,100% { transform: scale(1); } 40% { transform: scale(1.05); } }
+        @keyframes qpkDot { 0% { box-shadow: 0 0 0 0 rgba(var(--fx-amber), .6), 0 0 8px rgba(var(--fx-amber), .8); }
+          70%,100% { box-shadow: 0 0 0 7px rgba(var(--fx-amber), 0), 0 0 8px rgba(var(--fx-amber), .8); } }
 
-        /* ---- expanded panel ---- */
-        .qpk-panel { width: min(320px, calc(100vw - 24px)); background: var(--paper); border: 1px solid var(--line);
-          border-radius: var(--r-md, 16px); overflow: hidden; transform-origin: bottom left;
-          box-shadow: 0 26px 60px -22px rgba(70,50,35,.5); animation: qpkIn .24s cubic-bezier(.22,1,.36,1); }
+        /* ---- expanded panel: a frosted holo console ---- */
+        .qpk-panel { position: relative; width: min(320px, calc(100vw - 24px));
+          border-radius: var(--r-md, 16px); overflow: hidden; transform-origin: bottom left; isolation: isolate;
+          box-shadow: 0 30px 70px -24px rgba(20,12,8,.55), 0 0 0 1px rgba(var(--fx-glow), .06),
+            0 0 40px -12px rgba(var(--fx-glow), .28); animation: qpkIn .28s cubic-bezier(.22,1,.36,1); }
+        .qpk-aurora { z-index: 0; opacity: .42; }
+        .qpk-panel > *:not(.qpk-aurora) { position: relative; z-index: 1; }
         @keyframes qpkIn { from { opacity: 0; transform: translateY(10px) scale(.97); } to { opacity: 1; transform: none; } }
 
         .qpk-panel__head { display: flex; align-items: center; gap: .65rem; width: 100%; padding: .7rem .8rem;
-          background: transparent; border: none; border-bottom: 1px solid var(--line); cursor: pointer; font-family: inherit; text-align: left; }
-        .qpk-panel__head:hover { background: var(--accent-50); }
+          background: transparent; border: none; border-bottom: 1px solid rgba(var(--fx-line), calc(var(--fx-hairline) + .2));
+          cursor: pointer; font-family: inherit; text-align: left; }
+        .qpk-panel__head:hover { background: rgba(var(--fx-glow), .06); }
+        .qpk-panel__head .qpk-ring { filter: drop-shadow(0 0 5px rgba(var(--fx-glow), .45)); }
         .qpk-panel__meta { display: flex; flex-direction: column; gap: .1rem; flex: 1; min-width: 0; }
         .qpk-panel__title { font-size: .95rem; color: var(--ink); }
         .qpk-panel__x { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; color: var(--n-600); flex: none; }
-        .qpk-panel__head:hover .qpk-panel__x { background: var(--paper); color: var(--ink); }
+        .qpk-panel__head:hover .qpk-panel__x { background: rgba(var(--fx-line), .5); color: var(--ink); }
 
         .qpk-list { display: flex; flex-direction: column; padding: .35rem; max-height: 46dvh; overflow-y: auto; }
-        .qpk-row { display: flex; align-items: center; gap: .6rem; padding: .55rem .5rem; border-radius: 12px; transition: background .15s; }
+        .qpk-row { display: flex; align-items: center; gap: .6rem; padding: .55rem .5rem; border-radius: 12px;
+          transition: background .15s, box-shadow .2s; }
         .qpk-row + .qpk-row { margin-top: .1rem; }
-        .qpk-row:hover { background: var(--n-50, var(--accent-50)); }
-        .qpk-row.is-ready { background: var(--gold-bg); }
-        .qpk-row.is-claimed { opacity: .62; }
+        .qpk-row:hover { background: rgba(var(--fx-line), .4); }
+        .qpk-row.is-ready { background: rgba(var(--fx-amber), .1); box-shadow: inset 0 0 0 1px rgba(var(--fx-amber), .22); }
+        .qpk-row.is-claimed { opacity: .58; }
         .qpk-row__ic { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px;
-          background: var(--accent-50); color: var(--accent-600); flex: none; }
-        .qpk-row.is-ready .qpk-row__ic { background: var(--gold-bg); color: var(--gold); }
+          background: rgba(var(--fx-glow), .12); color: var(--accent-600); flex: none; }
+        .qpk-row.is-ready .qpk-row__ic { background: rgba(var(--fx-amber), .2); color: rgb(var(--fx-amber));
+          box-shadow: 0 0 10px -2px rgba(var(--fx-amber), .5); }
         .qpk-row__body { flex: 1; min-width: 0; }
         .qpk-row__top { display: flex; align-items: baseline; gap: .5rem; }
         .qpk-row__title { flex: 1; min-width: 0; font-size: .88rem; color: var(--ink); }
         .qpk-row__reward { color: var(--n-600); white-space: nowrap; font-variant-numeric: tabular-nums; }
-        .qpk-row__spk { display: inline-flex; align-items: center; gap: 1px; color: var(--gold); }
-        .qpk-bar { margin-top: .35rem; height: 5px; border-radius: 999px; background: var(--line); overflow: hidden; }
-        .qpk-bar__fill { display: block; height: 100%; border-radius: 999px;
-          background: linear-gradient(90deg, var(--accent-300), var(--accent-600)); transition: width .6s cubic-bezier(.22,1,.36,1); }
-        .qpk-row.is-ready .qpk-bar__fill, .qpk-row.is-claimed .qpk-bar__fill { background: linear-gradient(90deg, var(--gold), var(--accent-600)); }
+        .qpk-row__spk { display: inline-flex; align-items: center; gap: 1px; color: rgb(var(--fx-gold)); }
+        .qpk-bar { margin-top: .35rem; height: 6px; border-radius: 999px; background: rgba(var(--fx-ink, 40,28,22), .12);
+          overflow: hidden; box-shadow: inset 0 1px 2px rgba(20,12,8,.18); }
+        .qpk-bar__fill { display: block; height: 100%; border-radius: 999px; transition: width .6s cubic-bezier(.22,1,.36,1);
+          box-shadow: 0 0 10px -1px rgba(var(--fx-glow), .5); }
         .qpk-row__end { flex: none; display: grid; place-items: center; min-width: 52px; }
         .qpk-prog { font-variant-numeric: tabular-nums; }
-        .qpk-check { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--sage-bg); color: var(--sage); }
+        .qpk-check { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
+          background: rgba(var(--fx-teal), .2); color: rgb(var(--fx-teal)); box-shadow: 0 0 12px -3px rgba(var(--fx-teal), .6); }
 
-        .qpk-claim { font-family: inherit; font-size: .82rem; font-weight: 700; color: #fff; cursor: pointer;
-          padding: .38rem .8rem; border-radius: 999px; border: none;
-          background: linear-gradient(135deg, var(--gold), var(--accent-600));
-          box-shadow: 0 6px 16px -6px rgba(221,154,46,.7); animation: qpkGlow 1.8s ease-in-out infinite;
-          transition: transform .14s, box-shadow .18s, filter .15s; }
-        .qpk-claim:hover { transform: translateY(-1px); filter: brightness(1.06); box-shadow: 0 10px 22px -6px rgba(221,154,46,.8); }
-        .qpk-claim:active { transform: translateY(0) scale(.95); }
-        @keyframes qpkGlow { 0%,100% { box-shadow: 0 6px 16px -6px rgba(221,154,46,.6); } 50% { box-shadow: 0 6px 22px -4px rgba(221,154,46,.95); } }
+        /* ---- claim: a glassy neon button that flashes on tap ---- */
+        .qpk-claim { position: relative; overflow: hidden; font-family: inherit; font-size: .82rem; font-weight: 700;
+          color: var(--ink); cursor: pointer; padding: .4rem .85rem; border-radius: 999px;
+          border: 1px solid rgba(var(--fx-amber), .5) !important;
+          box-shadow: 0 0 0 1px rgba(var(--fx-amber), .3), 0 0 14px -2px rgba(var(--fx-amber), .55),
+            0 6px 16px -8px rgba(20,12,8,.5) !important;
+          animation: qpkClaimGlow 1.8s ease-in-out infinite; transition: transform .14s, box-shadow .18s, filter .15s; }
+        .qpk-claim__lbl { position: relative; z-index: 2; background: var(--fx-holo); background-size: 300% 100%;
+          -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent;
+          animation: qpkClaimText 5s linear infinite; }
+        .qpk-claim::after { content: ""; position: absolute; inset: 0; z-index: 1;
+          background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,.55) 50%, transparent 70%);
+          transform: translateX(-120%); animation: qpkClaimSweep 2.6s var(--fx-ease, ease) infinite; pointer-events: none; }
+        .qpk-claim:hover { transform: translateY(-1px); filter: brightness(1.05);
+          box-shadow: 0 0 0 1px rgba(var(--fx-amber), .5), 0 0 22px 0 rgba(var(--fx-amber), .7), 0 10px 22px -8px rgba(20,12,8,.55) !important; }
+        .qpk-claim:active { transform: translateY(0) scale(.94); }
+        @keyframes qpkClaimGlow { 0%,100% { box-shadow: 0 0 0 1px rgba(var(--fx-amber), .3), 0 0 12px -2px rgba(var(--fx-amber), .5), 0 6px 16px -8px rgba(20,12,8,.5); }
+          50% { box-shadow: 0 0 0 1px rgba(var(--fx-amber), .5), 0 0 26px 0 rgba(var(--fx-amber), .8), 0 6px 16px -8px rgba(20,12,8,.5); } }
+        @keyframes qpkClaimText { to { background-position: 300% 0; } }
+        @keyframes qpkClaimSweep { 0% { transform: translateX(-120%); } 55%,100% { transform: translateX(120%); } }
 
         .qpk-seeall { display: flex; align-items: center; justify-content: center; gap: .35rem; padding: .7rem;
-          border-top: 1px solid var(--line); font-size: .85rem; font-weight: 700; color: var(--accent-700);
-          text-decoration: none; transition: background .15s, gap .15s; }
-        .qpk-seeall:hover { background: var(--accent-50); gap: .55rem; }
+          border-top: 1px solid rgba(var(--fx-line), calc(var(--fx-hairline) + .2)); font-size: .85rem; font-weight: 700;
+          color: var(--accent-700); text-decoration: none; transition: background .15s, gap .15s; }
+        .qpk-seeall:hover { background: rgba(var(--fx-glow), .08); gap: .55rem; }
         .qpk-seeall svg { transition: transform .18s; }
         .qpk-seeall:hover svg { transform: translateX(2px); }
 
@@ -229,8 +278,9 @@ export default function QuestPeek() {
         }
 
         @media (prefers-reduced-motion: reduce) {
-          .qpk-pill, .qpk-panel, .qpk-pill__dot, .qpk-claim, .qpk-bar__fill { animation: none !important; transition: none !important; }
-          .qpk-pill.is-pulse { animation: none !important; }
+          .qpk-pill, .qpk-panel, .qpk-pill__dot, .qpk-claim, .qpk-claim__lbl, .qpk-bar__fill { animation: none !important; transition: none !important; }
+          .qpk-pill.is-pulse, .qpk-pill.is-hot { animation: none !important; }
+          .qpk-claim::after { display: none; }
         }
       `}</style>
     </div>

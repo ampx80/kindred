@@ -14,6 +14,7 @@ import { sSuccess, sTap } from '../lib/sound.js';
 import { haptic } from '../lib/haptics.js';
 import { celebrate, burstFrom } from '../lib/celebrate.js';
 import { track } from '../lib/track.js';
+import FxBackdrop from '../components/FxBackdrop.jsx';
 
 const prefersReduced = () =>
   typeof window !== 'undefined' && window.matchMedia &&
@@ -67,8 +68,11 @@ export default function Rewards() {
   const game = useGame();
   const toast = useToast();
   const [shake, setShake] = useState(false);
+  const [flashId, setFlashId] = useState(null);
+  const flashTimer = useRef(0);
 
   useEffect(() => { track('rewards_view'); }, []);
+  useEffect(() => () => clearTimeout(flashTimer.current), []);
 
   const sparks = game.sparks || 0;
   const freezes = game.freezes || 0;
@@ -82,6 +86,13 @@ export default function Rewards() {
     sTap();
     const res = buyReward(reward.id);
     if (res.ok) {
+      // Visual-only holographic flash on the purchased card. Does not touch the
+      // purchase result; just paints a burst that clears itself shortly after.
+      if (!prefersReduced()) {
+        setFlashId(reward.id);
+        clearTimeout(flashTimer.current);
+        flashTimer.current = setTimeout(() => setFlashId(null), 760);
+      }
       burstFrom(e);
       celebrate();
       haptic('success');
@@ -118,8 +129,11 @@ export default function Rewards() {
       position: absolute; inset: -50% -20% auto auto; width: 320px; height: 320px;
       background: radial-gradient(circle, rgba(224,121,78,.18), transparent 68%);
       pointer-events: none; animation: rwxDrift 9s ease-in-out infinite alternate;
+      z-index: 1;
     }
     @keyframes rwxDrift { from { transform: translate(0,0); } to { transform: translate(-26px, 18px); } }
+    /* Keep hero content above the imported aurora backdrop. */
+    .rwx .rwx-hero > *:not(.fx-backdrop):not(.rwx-hero__glow) { position: relative; z-index: 2; }
 
     .rwx .rwx-hero__top { display: flex; align-items: center; gap: .85rem; position: relative; }
     .rwx .rwx-hero__eyebrow { font-size: .74rem; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--n-500); }
@@ -133,12 +147,42 @@ export default function Rewards() {
       display: grid; place-items: center; width: 56px; height: 56px; flex: none;
       border-radius: 18px; background: var(--gold-bg); color: var(--gold);
       box-shadow: inset 0 0 0 1px rgba(221,154,46,.28);
+      --fx-glow: var(--fx-gold);
     }
+    /* Soften the imported conic ring so the shop reads warm, not laser-cut. */
+    .rwx .rwx-balance__spark.fx-ring::before { opacity: .7; }
     .rwx .rwx-balance__spark svg { animation: rwxSpin 6s ease-in-out infinite; }
     @keyframes rwxSpin { 0%,100% { transform: rotate(-8deg) scale(1); } 50% { transform: rotate(8deg) scale(1.08); } }
+
+    /* Floating spark motes rising off the balance readout. */
+    .rwx .rwx-mote {
+      position: absolute; left: 28px; bottom: 18px; width: 6px; height: 6px;
+      border-radius: 999px; pointer-events: none; z-index: 3;
+      background: radial-gradient(circle, rgba(var(--fx-gold),.95), rgba(var(--fx-amber),0) 70%);
+      box-shadow: 0 0 10px rgba(var(--fx-gold),.8);
+      opacity: 0; animation: rwxMote 4.6s var(--fx-ease, ease-in-out) infinite;
+    }
+    @keyframes rwxMote {
+      0% { opacity: 0; transform: translate(0,0) scale(.6); }
+      12% { opacity: .95; }
+      70% { opacity: .55; }
+      100% { opacity: 0; transform: translate(var(--mx, 10px), -68px) scale(1.15); }
+    }
+
     .rwx .rwx-balance__num {
       font-family: var(--font-display, inherit); font-weight: 700; line-height: .95;
       font-size: clamp(3rem, 9vw, 4.2rem); letter-spacing: -.03em; color: var(--ink);
+    }
+    /* Holographic spark readout: iridescent fill + a warm neon bloom. */
+    .rwx .rwx-holo-num {
+      --fx-glow: var(--fx-amber);
+      display: inline-block;
+      filter: drop-shadow(0 0 14px rgba(var(--fx-amber),.45)) drop-shadow(0 0 30px rgba(var(--fx-magenta),.22));
+      animation: fx-holo-shift 6s linear infinite, rwxBloom 3.6s var(--fx-ease, ease-in-out) infinite;
+    }
+    @keyframes rwxBloom {
+      0%,100% { filter: drop-shadow(0 0 12px rgba(var(--fx-amber),.4)) drop-shadow(0 0 26px rgba(var(--fx-magenta),.18)); }
+      50% { filter: drop-shadow(0 0 22px rgba(var(--fx-amber),.7)) drop-shadow(0 0 46px rgba(var(--fx-magenta),.34)); }
     }
     .rwx .rwx-balance__unit { font-size: 1.05rem; font-weight: 650; color: var(--n-500); margin-left: .1rem; }
     .rwx .rwx-balance.is-shake { animation: rwxShake .5s cubic-bezier(.36,.07,.19,.97); }
@@ -173,13 +217,59 @@ export default function Rewards() {
       display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1rem;
     }
     .rwx .rwx-card {
+      position: relative; overflow: hidden;
       display: flex; flex-direction: column; gap: .7rem;
       padding: 1.2rem 1.15rem; border-radius: var(--r-md, 16px);
-      border: 1px solid var(--line); background: var(--paper);
+      border: 1px solid var(--line);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.5), rgba(255,255,255,.14)),
+        var(--paper);
+      -webkit-backdrop-filter: blur(10px) saturate(140%);
+      backdrop-filter: blur(10px) saturate(140%);
       transition: transform .16s var(--ease), border-color .16s var(--ease), box-shadow .16s var(--ease);
     }
     .rwx .rwx-card:hover { transform: translateY(-3px); border-color: var(--accent-300); box-shadow: var(--shadow-md); }
-    .rwx .rwx-card.is-owned { background: linear-gradient(180deg, var(--sage-bg), var(--paper)); border-color: var(--sage); }
+    /* Soften the iridescent accent ring so it reads as a warm frame, not a beacon. */
+    .rwx .rwx-card.fx-ring::before { opacity: .32; transition: opacity .2s var(--ease); }
+    .rwx .rwx-card.fx-ring:hover::before { opacity: .6; }
+    /* Affordable, buyable cards get an inviting warm breathe. */
+    .rwx .rwx-card.is-afford { --fx-glow: var(--fx-amber); }
+    /* Owned: a calm, crystalline sage state, no breathing glow. */
+    .rwx .rwx-card.is-owned {
+      background:
+        linear-gradient(160deg, rgba(var(--fx-cyan),.14), rgba(255,255,255,.05) 55%),
+        linear-gradient(180deg, var(--sage-bg), var(--paper));
+      border-color: var(--sage);
+    }
+    .rwx .rwx-card.is-owned.fx-ring::before { opacity: .18; animation: none; }
+    .rwx .rwx-card.is-owned::after {
+      content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 0;
+      background: linear-gradient(125deg, transparent 42%, rgba(255,255,255,.4) 50%, transparent 58%);
+      mix-blend-mode: screen;
+    }
+    .rwx .rwx-card > * { position: relative; z-index: 1; }
+    /* Holographic purchase burst, painted only on the just-bought card. */
+    .rwx .rwx-burst {
+      position: absolute; inset: 0; z-index: 4; pointer-events: none; border-radius: inherit;
+      background:
+        radial-gradient(circle at 50% 55%, rgba(var(--fx-gold),.55), transparent 55%),
+        radial-gradient(circle at 50% 55%, rgba(var(--fx-magenta),.35), transparent 62%);
+      opacity: 0; animation: rwxBurst .72s var(--fx-ease, ease-out) forwards;
+    }
+    .rwx .rwx-burst::before {
+      content: ""; position: absolute; inset: 0; border-radius: inherit;
+      border: 2px solid rgba(var(--fx-gold),.7);
+      animation: rwxBurstRing .72s var(--fx-ease, ease-out) forwards;
+    }
+    @keyframes rwxBurst {
+      0% { opacity: 0; transform: scale(.6); }
+      30% { opacity: 1; }
+      100% { opacity: 0; transform: scale(1.04); }
+    }
+    @keyframes rwxBurstRing {
+      0% { opacity: .9; transform: scale(.5); }
+      100% { opacity: 0; transform: scale(1.25); }
+    }
     .rwx .rwx-card__chip { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 15px; flex: none; }
     .rwx .rwx-card__name { font-weight: 700; font-size: 1.05rem; letter-spacing: -.01em; }
     .rwx .rwx-card__desc { font-size: .9rem; line-height: 1.45; color: var(--n-600); flex: 1; }
@@ -187,11 +277,17 @@ export default function Rewards() {
 
     .rwx .rwx-card__foot { display: flex; align-items: center; justify-content: space-between; gap: .6rem; margin-top: .2rem; }
     .rwx .rwx-cost {
+      --fx-glow: var(--fx-gold);
       display: inline-flex; align-items: center; gap: .35rem;
       padding: .4rem .7rem; border-radius: 999px; font-weight: 700; font-size: .92rem;
       background: var(--gold-bg); color: var(--gold); font-variant-numeric: tabular-nums;
       white-space: nowrap;
+      box-shadow:
+        inset 0 0 0 1px rgba(var(--fx-gold),.4),
+        0 0 12px rgba(var(--fx-gold),.32),
+        0 0 26px rgba(var(--fx-gold),.16);
     }
+    .rwx .rwx-cost svg { filter: drop-shadow(0 0 4px rgba(var(--fx-gold),.7)); }
     .rwx .rwx-owned-pill {
       display: inline-flex; align-items: center; gap: .35rem;
       color: var(--sage); font-weight: 700; font-size: .92rem;
@@ -206,6 +302,11 @@ export default function Rewards() {
       .rwx .rwx-hero__glow, .rwx .rwx-balance__spark svg { animation: none; }
       .rwx .rwx-balance.is-shake { animation: none; }
       .rwx .rwx-card:hover, .rwx .rwx-earn__item:hover { transform: none; }
+      /* No motes, no bloom pulse, no purchase burst under reduced motion. The
+         holo fill and static neon glow stay as steady visual texture. */
+      .rwx .rwx-mote { display: none; }
+      .rwx .rwx-holo-num { animation: none; filter: drop-shadow(0 0 12px rgba(var(--fx-amber),.4)); }
+      .rwx .rwx-burst { display: none; }
     }
   `;
 
@@ -215,22 +316,29 @@ export default function Rewards() {
 
       {/* Hero: Aria + balance */}
       <div className="rwx-hero rwx-rise">
+        <FxBackdrop density={30} glow="250,138,74" />
         <div className="rwx-hero__glow" aria-hidden />
         <div className="rwx-hero__top">
           <span className="aria-orb" aria-hidden style={{ width: 44, height: 44 }} />
           <div className="col" style={{ gap: '.15rem', minWidth: 0 }}>
             <span className="rwx-hero__eyebrow">The spark shop</span>
-            <h1 className="rwx-hero__title">Spend what you earned</h1>
+            <h1 className="rwx-hero__title fx-holo-text">Spend what you earned</h1>
           </div>
         </div>
 
         <div className={`rwx-balance${shake ? ' is-shake' : ''}`}>
-          <span className="rwx-balance__spark" aria-hidden>
+          <span className="rwx-balance__spark fx-ring fx-neon" aria-hidden>
             <Icon name="sparkles" size={30} />
           </span>
+          {/* Floating spark motes rising off the readout (motion-safe only). */}
+          <span className="rwx-mote" aria-hidden style={{ left: 26, animationDelay: '0s', '--mx': '-6px' }} />
+          <span className="rwx-mote" aria-hidden style={{ left: 40, animationDelay: '1.1s', '--mx': '12px' }} />
+          <span className="rwx-mote" aria-hidden style={{ left: 54, animationDelay: '2.3s', '--mx': '-14px' }} />
+          <span className="rwx-mote" aria-hidden style={{ left: 34, animationDelay: '3.2s', '--mx': '8px' }} />
           <div className="col" style={{ gap: '.1rem' }}>
             <span className="rwx-balance__num">
-              <AnimatedNumber value={sparks} /><span className="rwx-balance__unit">sparks</span>
+              <span className="rwx-holo-num fx-holo-text"><AnimatedNumber value={sparks} /></span>
+              <span className="rwx-balance__unit">sparks</span>
             </span>
             <span className="muted t-sm">Your balance, ready to spend</span>
           </div>
@@ -268,11 +376,14 @@ export default function Rewards() {
           {REWARDS.map((r, i) => {
             const tint = TINTS[r.type] || TINTS.badge;
             const owned = !r.repeatable && ownsReward(r.id);
+            const affordable = !owned && sparks >= r.cost;
             const showComingSoon = r.type === 'theme' || r.type === 'aria-voice';
+            const stateClass = owned ? ' is-owned' : (affordable ? ' is-afford fx-neon-breathe' : '');
             return (
               <div key={r.id}
-                className={`rwx-card rwx-rise${owned ? ' is-owned' : ''}`}
+                className={`rwx-card rwx-rise fx-ring${stateClass}`}
                 style={{ animationDelay: `${Math.min(0.12 + i * 0.05, 0.4)}s` }}>
+                {flashId === r.id && <span className="rwx-burst" aria-hidden />}
                 <span className="rwx-card__chip" style={{ background: tint.chip, color: tint.ink }}>
                   <Icon name={r.icon} size={24} />
                 </span>

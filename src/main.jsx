@@ -10,6 +10,7 @@ import { initNative, isNative } from './lib/native.js';
 import { initGame } from './lib/game.js';
 import { initAriaNudges } from './lib/ariaNudges.js';
 import './index.css';
+import './styles/futuristic.css';
 
 // Native shell (Capacitor iOS/Android): route API calls to production, theme the
 // status bar, wire the back button and keyboard, add safe-area insets, register

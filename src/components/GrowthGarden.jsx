@@ -93,7 +93,18 @@ function buildTree() {
     drift: (rand() - 0.5) * 30,
   }));
 
-  return { branches, leaves, fireflies, petals };
+  // Bioluminescent light motes that rise through the canopy with a soft bloom.
+  const motes = Array.from({ length: 7 }, () => ({
+    x: 70 + rand() * 280,
+    y: 150 + rand() * 200,
+    r: 1 + rand() * 1.7,
+    delay: rand() * 6,
+    dur: 6 + rand() * 5,
+    drift: (rand() - 0.5) * 26,
+    cool: rand(), // picks a cool holo hue per mote
+  }));
+
+  return { branches, leaves, fireflies, petals, motes };
 }
 
 const TREE = buildTree();
@@ -152,6 +163,17 @@ export default function GrowthGarden({ size }) {
 
   const visibleFireflies = progress > 0.5 ? Math.min(8, Math.round((progress - 0.5) * 18)) : 0;
   const visiblePetals = progress > 0.55 ? Math.min(7, Math.round((progress - 0.5) * 12)) : 0;
+  const visibleMotes = progress > 0.32 ? Math.min(7, Math.round((progress - 0.28) * 12)) : 0;
+
+  // Holographic aura intensity rises as the organism matures (comma-rgb fx vars).
+  const auraStrength = 0.22 + progress * 0.5;
+  const auraR = glowR * 1.32;
+  const moteHue = (c) =>
+    c < 0.34
+      ? 'rgb(var(--fx-cyan))'
+      : c < 0.67
+        ? 'rgb(var(--fx-teal))'
+        : 'rgb(var(--fx-violet))';
 
   let blossomCount = 0;
   for (const l of TREE.leaves) if (progress >= l.blossomBloom) blossomCount++;
@@ -202,8 +224,52 @@ export default function GrowthGarden({ size }) {
             <stop offset="0" stopColor="var(--sage-bg)" />
             <stop offset="1" stopColor="#dbe6d1" />
           </radialGradient>
+          {/* iridescent holo gradient for petals - warm gold sliding to cool violet */}
+          <linearGradient id={`${P}-holo`} x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" style={{ stopColor: 'rgb(var(--fx-gold))' }} />
+            <stop offset="0.5" style={{ stopColor: 'rgb(var(--fx-magenta))' }} />
+            <stop offset="1" style={{ stopColor: 'rgb(var(--fx-violet))' }} />
+          </linearGradient>
+          {/* glowing energy vein - warm at the roots, teal-lit at the tips */}
+          <linearGradient id={`${P}-vein`} gradientUnits="userSpaceOnUse" x1="0" y1="404" x2="0" y2="60">
+            <stop offset="0" style={{ stopColor: 'rgb(var(--fx-amber))' }} />
+            <stop offset="0.55" style={{ stopColor: 'rgb(var(--fx-gold))' }} />
+            <stop offset="1" style={{ stopColor: 'rgb(var(--fx-teal))' }} />
+          </linearGradient>
+          {/* holographic aura halo behind the canopy */}
+          <radialGradient id={`${P}-aura`} cx="0.5" cy="0.5" r="0.5">
+            <stop offset="0" style={{ stopColor: 'rgb(var(--fx-magenta))', stopOpacity: 0.55 }} />
+            <stop offset="0.42" style={{ stopColor: 'rgb(var(--fx-violet))', stopOpacity: 0.32 }} />
+            <stop offset="0.72" style={{ stopColor: 'rgb(var(--fx-cyan))', stopOpacity: 0.16 }} />
+            <stop offset="1" style={{ stopColor: 'rgb(var(--fx-amber))', stopOpacity: 0 }} />
+          </radialGradient>
           <filter id={soft} x="-60%" y="-60%" width="220%" height="220%">
             <feGaussianBlur stdDeviation="2.4" />
+          </filter>
+          {/* soft neon glow that halos the whole foliage without muddying its shapes */}
+          <filter id={`${P}-neon`} x="-70%" y="-70%" width="240%" height="240%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="1.7" result="nb" />
+            <feMerge>
+              <feMergeNode in="nb" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+          {/* stronger bloom for drifting light motes and fireflies */}
+          <filter id={`${P}-bloom`} x="-140%" y="-140%" width="380%" height="380%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="bb" />
+            <feMerge>
+              <feMergeNode in="bb" />
+              <feMergeNode in="bb" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+          {/* glow for the pulsing energy veins */}
+          <filter id={`${P}-veinglow`} x="-80%" y="-80%" width="260%" height="260%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="1.9" result="vb" />
+            <feMerge>
+              <feMergeNode in="vb" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
           </filter>
         </defs>
 
@@ -215,7 +281,18 @@ export default function GrowthGarden({ size }) {
         <ellipse cx={BASE_X} cy="410" rx="138" ry="26" fill={`url(#${P}-ground)`} />
 
         <g transform={scaleTransform}>
-          {/* breathing bloom of light behind the crown */}
+          {/* holographic aura halo behind the crown - slowly shifts hue */}
+          <g className={`${P}-aura`}>
+            <circle
+              cx={BASE_X}
+              cy="205"
+              r={auraR}
+              fill={`url(#${P}-aura)`}
+              opacity={auraStrength}
+            />
+          </g>
+
+          {/* breathing bloom of warm light behind the crown */}
           <g className={`${P}-glow`}>
             <circle
               cx={BASE_X}
@@ -246,6 +323,29 @@ export default function GrowthGarden({ size }) {
               );
             })}
 
+            {/* glowing energy veins tracing the branches - a slow bioluminescent pulse */}
+            <g className={`${P}-veins`} filter={`url(#${P}-veinglow)`}>
+              {TREE.branches.map((b, i) => {
+                if (progress < b.bloom) return null;
+                const t = easeOut((progress - b.bloom) / 0.12);
+                return (
+                  <line
+                    key={`v${i}`}
+                    x1={b.x1}
+                    y1={b.y1}
+                    x2={b.x2}
+                    y2={b.y2}
+                    stroke={`url(#${P}-vein)`}
+                    strokeWidth={Math.max(0.35, b.width * 0.2 * t)}
+                    strokeLinecap="round"
+                    opacity={(0.35 + 0.4 * t) * (0.4 + 0.6 * progress)}
+                  />
+                );
+              })}
+            </g>
+
+            {/* foliage - leaves and blossoms share one soft neon halo */}
+            <g filter={`url(#${P}-neon)`}>
             {TREE.leaves.map((l, i) => {
               if (progress < l.bloom) return null;
               const isBlossom = progress >= l.blossomBloom;
@@ -275,6 +375,7 @@ export default function GrowthGarden({ size }) {
                 </g>
               );
             })}
+            </g>
 
             {/* drifting petals (pure motion; rest gracefully when animation is off) */}
             {TREE.petals.slice(0, visiblePetals).map((p, i) => (
@@ -294,27 +395,44 @@ export default function GrowthGarden({ size }) {
                   cy={p.y}
                   rx="3"
                   ry="1.7"
-                  fill={BLOSSOM_COLORS[p.color]}
+                  fill={`url(#${P}-holo)`}
                   transform={`rotate(${p.rot} ${p.x} ${p.y})`}
-                  opacity="0.85"
+                  opacity="0.9"
                 />
               </g>
             ))}
           </g>
 
-          {/* fireflies twinkling in the upper air */}
-          {TREE.fireflies.slice(0, visibleFireflies).map((f, i) => (
-            <circle
-              key={`ff${i}`}
-              className={`${P}-firefly`}
-              cx={f.x}
-              cy={f.y}
-              r={f.r}
-              fill="var(--gold)"
-              filter={`url(#${soft})`}
-              style={{ animationDelay: `${f.delay}s`, animationDuration: `${f.dur}s` }}
-            />
-          ))}
+          {/* fireflies and rising light motes - all sharing one soft bloom */}
+          <g filter={`url(#${P}-bloom)`}>
+            {TREE.fireflies.slice(0, visibleFireflies).map((f, i) => (
+              <circle
+                key={`ff${i}`}
+                className={`${P}-firefly`}
+                cx={f.x}
+                cy={f.y}
+                r={f.r}
+                fill="var(--gold)"
+                style={{ animationDelay: `${f.delay}s`, animationDuration: `${f.dur}s` }}
+              />
+            ))}
+
+            {TREE.motes.slice(0, visibleMotes).map((m, i) => (
+              <circle
+                key={`mo${i}`}
+                className={`${P}-mote`}
+                cx={m.x}
+                cy={m.y}
+                r={m.r}
+                fill={moteHue(m.cool)}
+                style={{
+                  '--mdrift': `${m.drift}px`,
+                  animationDelay: `${m.delay}s`,
+                  animationDuration: `${m.dur}s`,
+                }}
+              />
+            ))}
+          </g>
         </g>
       </svg>
 
@@ -331,10 +449,43 @@ export default function GrowthGarden({ size }) {
 
       <style>{`
         .${P}-root {
+          position: relative;
           text-align: center;
+        }
+        /* faint holographic sheen behind the whole living scene */
+        .${P}-root::before {
+          content: '';
+          position: absolute;
+          inset: -8% -6% 14% -6%;
+          background: var(--fx-holo);
+          opacity: 0.07;
+          filter: blur(34px);
+          border-radius: 50%;
+          z-index: 0;
+          pointer-events: none;
+          animation: ${P}-sheen 16s ease-in-out infinite;
+        }
+        .${P}-svg,
+        .${P}-cap {
+          position: relative;
+          z-index: 1;
         }
         .${P}-svg {
           filter: drop-shadow(0 6px 18px rgba(76, 51, 32, 0.08));
+        }
+        .${P}-aura {
+          transform-box: fill-box;
+          transform-origin: 50% 50%;
+          animation: ${P}-aura 13s ease-in-out infinite;
+        }
+        .${P}-veins {
+          animation: ${P}-vein 5.5s ease-in-out infinite;
+        }
+        .${P}-mote {
+          transform-box: fill-box;
+          animation-name: ${P}-mote;
+          animation-timing-function: ease-in-out;
+          animation-iteration-count: infinite;
         }
         .${P}-glow {
           transform-box: fill-box;
@@ -390,7 +541,29 @@ export default function GrowthGarden({ size }) {
           88% { opacity: 0.85; }
           100% { transform: translate(var(--drift, 0px), 46px); opacity: 0; }
         }
+        @keyframes ${P}-sheen {
+          0%, 100% { filter: blur(34px) hue-rotate(-14deg); opacity: 0.055; }
+          50% { filter: blur(34px) hue-rotate(24deg); opacity: 0.1; }
+        }
+        @keyframes ${P}-aura {
+          0%, 100% { filter: hue-rotate(-16deg); opacity: 0.85; transform: scale(0.98); }
+          50% { filter: hue-rotate(30deg); opacity: 1; transform: scale(1.06); }
+        }
+        @keyframes ${P}-vein {
+          0%, 100% { opacity: 0.4; }
+          50% { opacity: 0.95; }
+        }
+        @keyframes ${P}-mote {
+          0% { transform: translate(0, 6px); opacity: 0; }
+          18% { opacity: 1; }
+          82% { opacity: 1; }
+          100% { transform: translate(var(--mdrift, 0px), -40px); opacity: 0; }
+        }
         @media (prefers-reduced-motion: reduce) {
+          .${P}-root::before,
+          .${P}-aura,
+          .${P}-veins,
+          .${P}-mote,
           .${P}-glow,
           .${P}-canopy,
           .${P}-firefly,
@@ -398,7 +571,10 @@ export default function GrowthGarden({ size }) {
             animation: none;
           }
           .${P}-glow { opacity: 1; }
+          .${P}-aura { opacity: 1; }
+          .${P}-veins { opacity: 0.8; }
           .${P}-firefly { opacity: 0.85; }
+          .${P}-mote { opacity: 0.9; }
           .${P}-petal { opacity: 0.85; }
         }
       `}</style>

@@ -11,6 +11,7 @@ import { track } from '../lib/track.js';
 import { useGame } from '../lib/game.js';
 import { rankFor, RANKS } from '../lib/gameContent.js';
 import GrowthGarden from '../components/GrowthGarden.jsx';
+import FxBackdrop from '../components/FxBackdrop.jsx';
 import * as store from '../lib/store.js';
 
 const prefersReduced = () =>
@@ -55,9 +56,17 @@ function XpRing({ pct = 0, size = 176, stroke = 13 }) {
       <defs>
         <linearGradient id="jnyRingGrad" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor="#e0794e" />
-          <stop offset="55%" stopColor="#d95d78" />
-          <stop offset="100%" stopColor="#dd9a2e" />
+          <stop offset="30%" stopColor="#d95d78" />
+          <stop offset="62%" stopColor="#9682f5" />
+          <stop offset="100%" stopColor="#6ecddc" />
         </linearGradient>
+        <filter id="jnyRingGlow" x="-30%" y="-30%" width="160%" height="160%">
+          <feGaussianBlur stdDeviation="3.4" result="b" />
+          <feMerge>
+            <feMergeNode in="b" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
       </defs>
       <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--n-100)" strokeWidth={stroke} />
       <circle
@@ -66,6 +75,7 @@ function XpRing({ pct = 0, size = 176, stroke = 13 }) {
         stroke="url(#jnyRingGrad)" strokeWidth={stroke} strokeLinecap="round"
         strokeDasharray={circ} strokeDashoffset={offset}
         transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        filter="url(#jnyRingGlow)"
       />
     </svg>
   );
@@ -144,45 +154,52 @@ export default function Journey() {
     /* ---- Hero ---- */
     .jnyx .jny-hero {
       position: relative; overflow: hidden; border-radius: var(--r-xl);
-      border: 1px solid var(--accent-300);
+      border: 1px solid rgba(var(--fx-amber), .35);
       background:
         radial-gradient(130% 130% at 8% 0%, var(--accent-50), transparent 58%),
         radial-gradient(120% 120% at 100% 10%, var(--gold-bg), transparent 60%),
         linear-gradient(180deg, var(--paper), var(--paper));
-      padding: 2.4rem 2.2rem;
+      padding: 2.6rem 2.4rem;
       display: grid; grid-template-columns: 1fr auto; gap: 2rem; align-items: center;
+      box-shadow: 0 24px 70px -30px rgba(var(--fx-amber), .55);
     }
-    .jnyx .jny-hero__glow {
-      position: absolute; inset: -30% -10% auto auto; width: 360px; height: 360px; pointer-events: none;
-      background: radial-gradient(circle, rgba(224,121,78,.18), transparent 68%);
-      animation: jnyDrift 10s ease-in-out infinite alternate;
-    }
-    @keyframes jnyDrift { from { transform: translate(0,0); } to { transform: translate(-26px, 20px); } }
+    .jnyx .jny-hero > .jny-hero__body,
+    .jnyx .jny-hero > .jny-ringwrap { position: relative; z-index: 2; }
     .jnyx .jny-hero__lead { display: flex; align-items: center; gap: .7rem; margin-bottom: 1rem; }
     .jnyx .jny-hero__orb { width: 30px; height: 30px; }
     .jnyx .jny-becoming { font-family: var(--font-display); font-weight: 600; line-height: 1.08;
       font-size: clamp(2.1rem, 5vw, 3.1rem); letter-spacing: -.02em; margin: 0 0 1.1rem; color: var(--ink); }
     .jnyx .jny-rank {
-      font-family: var(--font-display); font-weight: 700; line-height: 1;
-      font-size: clamp(2.6rem, 6vw, 3.8rem); letter-spacing: -.02em;
-      background: linear-gradient(115deg, #d95d78, #e0794e 55%, #dd9a2e);
-      -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+      display: inline-block;
+      font-family: var(--font-display); font-weight: 800; line-height: 1;
+      font-size: clamp(3rem, 8vw, 5rem); letter-spacing: -.03em;
+      filter: drop-shadow(0 4px 26px rgba(var(--fx-magenta), .4));
     }
     .jnyx .jny-lvlpill {
       display: inline-flex; align-items: center; gap: .4rem; margin-left: .1rem;
-      padding: .3rem .8rem; border-radius: var(--r-pill);
-      background: var(--accent-50); color: var(--accent-700); font-weight: 700; font-size: .95rem;
-      border: 1px solid var(--accent-300);
+      padding: .38rem .9rem; border-radius: var(--r-pill);
+      color: var(--accent-700); font-weight: 800; font-size: .95rem;
+      --fx-glow: var(--fx-amber);
     }
-    .jnyx .jny-next { margin: 1rem 0 0; }
+    .jnyx .jny-next { margin: 1.1rem 0 0; }
 
     /* ---- XP ring ---- */
-    .jnyx .jny-ringwrap { position: relative; display: grid; place-items: center; flex: none; }
-    .jnyx .jny-ring__fill { transition: stroke-dashoffset 1.3s var(--ease); }
-    .jnyx .jny-ringcenter {
-      position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+    .jnyx .jny-ringwrap {
+      position: relative; display: grid; place-items: center; flex: none;
+      width: 208px; height: 208px; border-radius: 50%; padding: 12px;
+      --fx-glow: var(--fx-magenta);
     }
-    .jnyx .jny-ringpct { font-family: var(--font-display); font-weight: 700; font-size: 2rem; line-height: 1; color: var(--ink); font-variant-numeric: tabular-nums; }
+    .jnyx .jny-ring { position: relative; z-index: 1; }
+    .jnyx .jny-ring__fill { transition: stroke-dashoffset 1.3s var(--ease); }
+    .jnyx .jny-ringhalo {
+      position: absolute; inset: 14px; border-radius: 50%; z-index: 0; pointer-events: none;
+      background: radial-gradient(circle, rgba(var(--fx-amber), .22), transparent 70%);
+      animation: jnyfxPulse 4.6s var(--fx-ease) infinite;
+    }
+    .jnyx .jny-ringcenter {
+      position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+    }
+    .jnyx .jny-ringpct { font-family: var(--font-display); font-weight: 800; font-size: 2.1rem; line-height: 1; color: var(--ink); font-variant-numeric: tabular-nums; }
     .jnyx .jny-ringlbl { font-size: .72rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--n-600); margin-top: .3rem; }
 
     /* ---- Section heads ---- */
@@ -192,22 +209,42 @@ export default function Journey() {
     /* ---- Garden panel ---- */
     .jnyx .jny-garden {
       position: relative; overflow: hidden; border-radius: var(--r-xl);
-      border: 1px solid var(--sage); padding: 2rem;
+      border: 1px solid rgba(var(--fx-teal), .4); padding: 2.2rem;
       background:
         radial-gradient(120% 120% at 50% 0%, var(--sage-bg), transparent 62%),
         linear-gradient(180deg, var(--paper), var(--paper));
       text-align: center;
+      box-shadow: 0 24px 70px -34px rgba(var(--fx-teal), .6);
     }
-    .jnyx .jny-garden__stage { min-height: 60px; display: grid; place-items: center; margin: .4rem 0 1rem; }
+    .jnyx .jny-garden > .jny-garden__inner { position: relative; z-index: 2; }
+    .jnyx .jny-garden__stage {
+      min-height: 60px; display: grid; place-items: center; margin: .6rem auto 1.1rem; max-width: 560px;
+      padding: 1.4rem; border-radius: var(--r-lg); --fx-glow: var(--fx-teal);
+    }
     .jnyx .jny-garden__cap { font-family: var(--font-display); font-size: 1.2rem; line-height: 1.5; color: var(--ink-2); margin: 0; font-style: italic; }
 
     /* ---- Streaks ---- */
     .jnyx .jny-flames { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
     .jnyx .jny-flamecard {
+      position: relative; overflow: hidden;
       display: flex; flex-direction: column; align-items: center; gap: .5rem; text-align: center;
-      padding: 1.5rem 1rem; border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--paper);
+      padding: 1.7rem 1rem; border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--paper);
+      transition: transform .2s var(--ease), box-shadow .25s var(--ease);
     }
-    .jnyx .jny-flamecard.is-lit { border-color: var(--accent-300); background: linear-gradient(180deg, var(--accent-50), var(--paper)); }
+    .jnyx .jny-flamecard.is-lit {
+      border-color: rgba(var(--fx-amber), .4);
+      background: linear-gradient(180deg, var(--accent-50), var(--paper));
+      --fx-glow: var(--fx-amber);
+      box-shadow: 0 0 0 1px rgba(var(--fx-amber), .18), 0 18px 44px -22px rgba(var(--fx-amber), .6);
+    }
+    .jnyx .jny-flamecard.is-lit:hover { transform: translateY(-3px); }
+    .jnyx .jny-plasma {
+      position: absolute; z-index: 0; top: 6%; left: 50%; width: 130px; height: 130px; transform: translateX(-50%);
+      border-radius: 50%; pointer-events: none;
+      background: radial-gradient(circle, rgba(var(--fx-amber), .5), rgba(var(--fx-magenta), .22) 45%, transparent 70%);
+      filter: blur(10px); animation: jnyfxPlasma 3.2s var(--fx-ease) infinite;
+    }
+    .jnyx .jny-flamecard > *:not(.jny-plasma) { position: relative; z-index: 1; }
     .jnyx .jny-flame { position: relative; display: inline-grid; place-items: center; line-height: 0;
       filter: drop-shadow(0 4px 10px rgba(217,107,67,.28)); }
     .jnyx .jny-flame.is-cold { filter: grayscale(1) opacity(.4); }
@@ -220,37 +257,62 @@ export default function Journey() {
       30% { transform: scaleY(1.09) scaleX(.95) rotate(-2deg); }
       60% { transform: scaleY(.95) scaleX(1.04) rotate(2deg); }
     }
-    .jnyx .jny-flamecount { font-family: var(--font-display); font-weight: 700; font-size: 2.4rem; line-height: 1; color: var(--ink); font-variant-numeric: tabular-nums; }
+    .jnyx .jny-flamecount { font-family: var(--font-display); font-weight: 800; font-size: 2.6rem; line-height: 1; color: var(--ink); font-variant-numeric: tabular-nums; }
+    .jnyx .jny-flamecard.is-lit .jny-flamecount { filter: drop-shadow(0 2px 14px rgba(var(--fx-amber), .5)); }
     .jnyx .jny-flamelabel { font-weight: 650; font-size: .95rem; }
 
     /* ---- Tallies ---- */
     .jnyx .jny-tallies { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
     .jnyx .jny-tally {
-      display: flex; flex-direction: column; gap: .3rem; padding: 1.3rem 1.4rem;
-      border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--paper);
+      display: flex; flex-direction: column; gap: .3rem; padding: 1.4rem 1.5rem;
+      border-radius: var(--r-lg); border: 1px solid rgba(var(--fx-line), calc(var(--fx-hairline) + 0.2)); background: rgba(var(--fx-glass), var(--fx-glass-a));
+      -webkit-backdrop-filter: blur(14px) saturate(150%); backdrop-filter: blur(14px) saturate(150%);
+      box-shadow: 0 1px 0 rgba(255,255,255,.35) inset, 0 16px 44px -26px rgba(20,12,8,.4);
       transition: transform .2s var(--ease), box-shadow .2s var(--ease), border-color .2s var(--ease);
     }
-    .jnyx .jny-tally:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); border-color: var(--accent-300); }
-    .jnyx .jny-tally__ic { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center;
-      background: var(--accent-50); color: var(--accent-700); margin-bottom: .3rem; }
-    .jnyx .jny-tally__n { font-family: var(--font-display); font-weight: 700; font-size: 2.6rem; line-height: 1; letter-spacing: -.02em; color: var(--ink); }
+    .jnyx .jny-tally:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); border-color: rgba(var(--fx-amber), .4); }
+    .jnyx .jny-tally__ic {
+      width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center;
+      background: var(--accent-50); color: var(--accent-700); margin-bottom: .3rem;
+      --fx-glow: var(--fx-amber);
+    }
+    .jnyx .jny-tally__n {
+      font-family: var(--font-display); font-weight: 800; font-size: 2.8rem; line-height: 1; letter-spacing: -.02em;
+      filter: drop-shadow(0 2px 12px rgba(var(--fx-magenta), .28));
+    }
     .jnyx .jny-tally__lbl { font-weight: 650; }
     .jnyx .jny-tally__sub { font-size: .82rem; }
 
-    /* ---- Rank ladder ---- */
+    /* ---- Rank ladder (glowing timeline) ---- */
     .jnyx .jny-ladder { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: .7rem; }
     .jnyx .jny-rung {
       position: relative; display: flex; flex-direction: column; gap: .15rem;
-      padding: .85rem 1rem; border-radius: var(--r-md); border: 1px solid var(--line); background: var(--paper);
+      padding: 1.1rem 1rem .95rem; border-radius: var(--r-md); border: 1px solid var(--line); background: var(--paper);
+      transition: transform .2s var(--ease);
     }
-    .jnyx .jny-rung--done { background: var(--sage-bg); border-color: var(--sage); }
+    /* node dot on the timeline rail (top edge of each rung) */
+    .jnyx .jny-rung::after {
+      content: ""; position: absolute; top: -5px; left: 1rem; width: 9px; height: 9px; border-radius: 50%;
+      background: var(--n-300); box-shadow: 0 0 0 3px var(--paper);
+    }
+    .jnyx .jny-rung--done { background: var(--sage-bg); border-color: rgba(var(--fx-teal), .5); }
+    .jnyx .jny-rung--done::after { background: rgb(var(--fx-teal)); box-shadow: 0 0 0 3px var(--paper), 0 0 10px rgba(var(--fx-teal), .7); }
     .jnyx .jny-rung--now {
       background: linear-gradient(180deg, var(--accent-50), var(--paper));
-      border-color: var(--accent); box-shadow: var(--accent-glow);
+      border-color: rgba(var(--fx-amber), .6);
+      --fx-glow: var(--fx-amber); transform: translateY(-3px);
     }
-    .jnyx .jny-rung--locked { border-style: dashed; opacity: .7; }
+    .jnyx .jny-rung--now::after {
+      background: rgb(var(--fx-amber)); width: 12px; height: 12px; top: -6px;
+      box-shadow: 0 0 0 3px var(--paper), 0 0 14px rgba(var(--fx-amber), .9);
+      animation: jnyfxBeacon 2.4s var(--fx-ease) infinite;
+    }
+    .jnyx .jny-rung--locked { border-style: dashed; opacity: .68; }
     .jnyx .jny-rung__name { font-family: var(--font-display); font-weight: 700; font-size: 1.1rem; letter-spacing: -.01em; }
-    .jnyx .jny-rung--now .jny-rung__name { color: var(--accent-700); }
+    .jnyx .jny-rung--now .jny-rung__name {
+      display: inline-block; font-weight: 800;
+      filter: drop-shadow(0 2px 10px rgba(var(--fx-amber), .5));
+    }
     .jnyx .jny-rung__lvl { font-size: .78rem; font-weight: 650; color: var(--n-600); }
     .jnyx .jny-rung__tag {
       align-self: flex-start; margin-top: .3rem; font-size: .68rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase;
@@ -259,19 +321,32 @@ export default function Journey() {
     .jnyx .jny-rung--now .jny-rung__tag { background: var(--accent); color: #fff; }
     .jnyx .jny-rung--done .jny-rung__tag { background: var(--sage); color: #fff; }
 
-    /* ---- Quick links ---- */
+    /* ---- Quick links (glassy neon buttons) ---- */
     .jnyx .jny-links { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
     .jnyx .jny-link {
-      display: flex; align-items: center; gap: .9rem; padding: 1.2rem 1.3rem;
-      border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--paper); color: inherit;
-      transition: transform .18s var(--ease), box-shadow .18s var(--ease), border-color .18s var(--ease);
+      display: flex; align-items: center; gap: .9rem; padding: 1.25rem 1.35rem;
+      border-radius: var(--r-lg); color: inherit;
+      border: 1px solid rgba(var(--fx-line), calc(var(--fx-hairline) + 0.2));
+      background: rgba(var(--fx-glass), var(--fx-glass-a));
+      -webkit-backdrop-filter: blur(14px) saturate(150%); backdrop-filter: blur(14px) saturate(150%);
+      box-shadow: 0 1px 0 rgba(255,255,255,.35) inset, 0 16px 44px -26px rgba(20,12,8,.4);
+      transition: transform .18s var(--ease), box-shadow .25s var(--ease), border-color .18s var(--ease);
+      --fx-glow: var(--fx-amber);
     }
-    .jnyx .jny-link:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); border-color: var(--accent-300); }
-    .jnyx .jny-link__ic { width: 44px; height: 44px; border-radius: 13px; display: grid; place-items: center;
-      background: var(--accent-50); color: var(--accent-700); flex: none; }
+    .jnyx .jny-link:hover {
+      transform: translateY(-3px); border-color: rgba(var(--fx-amber), .5);
+      box-shadow: 0 0 0 1px rgba(var(--fx-amber), .3), 0 0 18px rgba(var(--fx-amber), .32), 0 18px 40px -22px rgba(var(--fx-amber), .55);
+    }
+    .jnyx .jny-link__ic { width: 46px; height: 46px; border-radius: 13px; display: grid; place-items: center;
+      background: var(--accent-50); color: var(--accent-700); flex: none; --fx-glow: var(--fx-magenta); }
     .jnyx .jny-link__t { font-weight: 700; }
     .jnyx .jny-link__s { font-size: .84rem; }
     .jnyx .jny-link__go { margin-left: auto; color: var(--n-400); flex: none; }
+
+    /* ---- Bespoke keyframes (unique jnyfx prefix) ---- */
+    @keyframes jnyfxPulse { 0%, 100% { opacity: .5; transform: scale(.94); } 50% { opacity: 1; transform: scale(1.04); } }
+    @keyframes jnyfxPlasma { 0%, 100% { opacity: .55; transform: translateX(-50%) scale(.9); } 50% { opacity: 1; transform: translateX(-50%) scale(1.12); } }
+    @keyframes jnyfxBeacon { 0%, 100% { box-shadow: 0 0 0 3px var(--paper), 0 0 10px rgba(var(--fx-amber), .6); } 50% { box-shadow: 0 0 0 3px var(--paper), 0 0 20px rgba(var(--fx-amber), 1), 0 0 34px rgba(var(--fx-amber), .55); } }
 
     @media (max-width: 760px) {
       .jnyx .jny-hero { grid-template-columns: 1fr; text-align: left; }
@@ -281,11 +356,11 @@ export default function Journey() {
 
     @media (prefers-reduced-motion: reduce) {
       .jnyx .jny-rise { opacity: 1; animation: none; transform: none; }
-      .jnyx .jny-hero__glow { animation: none; }
       .jnyx .jny-ring__fill { transition: none; }
+      .jnyx .jny-ringhalo, .jnyx .jny-plasma, .jnyx .jny-rung--now::after { animation: none; }
       .jnyx .jny-flame.is-lit .jny-flame__outer,
       .jnyx .jny-flame.is-lit .jny-flame__inner { animation: none; }
-      .jnyx .jny-tally:hover, .jnyx .jny-link:hover { transform: none; }
+      .jnyx .jny-tally:hover, .jnyx .jny-link:hover, .jnyx .jny-flamecard.is-lit:hover { transform: none; }
     }
   `;
 
@@ -295,16 +370,16 @@ export default function Journey() {
 
       {/* 1) Hero - who you are becoming */}
       <section className="jny-hero jny-rise">
-        <div className="jny-hero__glow" aria-hidden />
-        <div>
+        <FxBackdrop density={52} glow="250,138,74" />
+        <div className="jny-hero__body">
           <div className="jny-hero__lead">
             <span className="aria-orb jny-hero__orb" aria-hidden />
             <span className="jny-eyebrow">Your journey</span>
           </div>
           <h1 className="jny-becoming">You are becoming</h1>
           <div className="row wrap gap-2" style={{ alignItems: 'baseline' }}>
-            <span className="jny-rank">{g.rank}</span>
-            <span className="jny-lvlpill"><Icon name="sparkles" size={14} /> Level {g.level}</span>
+            <span className="jny-rank fx-holo-text">{g.rank}</span>
+            <span className="jny-lvlpill fx-glass fx-neon fx-neon-breathe"><Icon name="sparkles" size={14} /> Level {g.level}</span>
           </div>
           <p className="jny-next muted">
             {isMaxRank
@@ -313,7 +388,8 @@ export default function Journey() {
           </p>
         </div>
 
-        <div className="jny-ringwrap">
+        <div className="jny-ringwrap fx-ring fx-neon-breathe">
+          <span className="jny-ringhalo" aria-hidden />
           <XpRing pct={g.pct || 0} />
           <div className="jny-ringcenter">
             <span className="jny-ringpct">{pctWhole}%</span>
@@ -324,11 +400,14 @@ export default function Journey() {
 
       {/* 2) The Growth Garden centerpiece */}
       <section className="jny-garden jny-rise" style={{ animationDelay: '.06s' }}>
-        <span className="jny-eyebrow">Your garden</span>
-        <div className="jny-garden__stage">
-          <GrowthGarden />
+        <FxBackdrop density={30} glow="120,200,170" />
+        <div className="jny-garden__inner">
+          <span className="jny-eyebrow">Your garden</span>
+          <div className="jny-garden__stage fx-glass fx-ring">
+            <GrowthGarden />
+          </div>
+          <p className="jny-garden__cap">Your garden grows every time you show up.</p>
         </div>
-        <p className="jny-garden__cap">Your garden grows every time you show up.</p>
       </section>
 
       {/* 3) Streak showcase */}
@@ -345,6 +424,7 @@ export default function Journey() {
             const lit = s.value > 0;
             return (
               <div key={s.key} className={`jny-flamecard ${lit ? 'is-lit' : ''}`}>
+                {lit && <span className="jny-plasma" aria-hidden />}
                 <Flame lit={lit} />
                 <span className="jny-flamecount">{s.value}</span>
                 <span className="jny-flamelabel">{s.label}</span>
@@ -369,8 +449,8 @@ export default function Journey() {
         <div className="jny-tallies">
           {tallies.map(t => (
             <div key={t.key} className="jny-tally">
-              <span className="jny-tally__ic"><Icon name={t.icon} size={20} /></span>
-              <span className="jny-tally__n"><CountUp value={t.value} /></span>
+              <span className="jny-tally__ic fx-ring"><Icon name={t.icon} size={20} /></span>
+              <span className="jny-tally__n fx-holo-text"><CountUp value={t.value} /></span>
               <span className="jny-tally__lbl">{t.label}</span>
               <span className="jny-tally__sub muted">{t.sub}</span>
             </div>
@@ -412,7 +492,7 @@ export default function Journey() {
         <div className="jny-links">
           {quickLinks.map(l => (
             <Link key={l.to} to={l.to} className="jny-link" onClick={() => track('journey_link', { to: l.to })}>
-              <span className="jny-link__ic"><Icon name={l.icon} size={22} /></span>
+              <span className="jny-link__ic fx-ring"><Icon name={l.icon} size={22} /></span>
               <span className="col" style={{ minWidth: 0 }}>
                 <span className="jny-link__t">{l.title}</span>
                 <span className="jny-link__s muted clip">{l.sub}</span>

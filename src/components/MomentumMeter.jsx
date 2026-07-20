@@ -104,6 +104,15 @@ export default function MomentumMeter() {
   // Glow intensifies with momentum.
   const glow = 0.18 + (pct / 100) * 0.55;
   const glowSpread = 4 + (pct / 100) * 12;
+  // Iridescent motion + bloom all scale with momentum. The holo gradient flows
+  // faster as you climb, a traveling light pulse blooms in only at high heat,
+  // and a warm tint deepens the line from cool cyan sheen toward gold.
+  const norm = pct / 100;
+  const flowDur = (13 - norm * 8).toFixed(2);            // 13s calm -> 5s at full
+  const sweepDur = (3.6 - norm * 1.4).toFixed(2);        // sweep quickens near the top
+  const sweepOpacity = Math.max(0, (pct - 68) / 32).toFixed(3); // blooms in above ~68
+  const warm = (0.14 + norm * 0.5).toFixed(3);           // cool sheen -> golden warmth
+  const holoShadowA = (norm * 0.35).toFixed(3);          // iridescent halo at high heat
 
   return (
     <div className="kmm-root" aria-hidden="true">
@@ -112,11 +121,16 @@ export default function MomentumMeter() {
           className="kmm-fill"
           style={{
             width: `${pct}%`,
-            background: color,
-            boxShadow: `0 0 ${glowSpread}px ${glow.toFixed(3)}px ${color}`,
-            opacity: 0.55 + (pct / 100) * 0.45,
+            boxShadow: `0 0 ${glowSpread}px ${glow.toFixed(3)}px ${color}, 0 0 ${(glowSpread * 1.6).toFixed(2)}px 0px rgba(var(--fx-cyan), ${holoShadowA})`,
+            opacity: 0.55 + norm * 0.45,
+            '--kmm-tint': color,
+            '--kmm-flow-dur': `${flowDur}s`,
+            '--kmm-sweep-dur': `${sweepDur}s`,
+            '--kmm-sweep-o': sweepOpacity,
+            '--kmm-warm': warm,
           }}
         >
+          <span className="kmm-sweep" />
           <span className="kmm-tip" style={{ background: color }} />
         </div>
       </div>
@@ -142,32 +156,85 @@ export default function MomentumMeter() {
           top: 0;
           left: 0;
           bottom: 0;
+          overflow: hidden;
           border-radius: 0 2px 2px 0;
+          background: var(--fx-holo, linear-gradient(90deg,
+            rgba(var(--fx-cyan), 1), rgba(var(--fx-teal), 1),
+            rgba(var(--fx-amber), 1), rgba(var(--fx-gold), 1),
+            rgba(var(--fx-magenta), 1), rgba(var(--fx-violet), 1)));
+          background-size: 280% 100%;
+          background-position: 0% 50%;
           transition: width 900ms cubic-bezier(0.22, 1, 0.36, 1),
-                      background 1200ms ease,
                       opacity 1200ms ease,
                       box-shadow 1200ms ease;
-          animation: kmm-breathe 6.5s ease-in-out infinite;
+          animation: kmm-flow var(--kmm-flow-dur, 10s) linear infinite,
+                     kmm-breathe 6.5s ease-in-out infinite;
+          will-change: background-position, filter;
+        }
+        /* Warm climb: a soft-light tint that deepens the line from cool sheen
+           toward gold as momentum rises. Sits below the traveling pulse. */
+        .kmm-fill::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background: var(--kmm-tint, var(--gold));
+          mix-blend-mode: soft-light;
+          opacity: var(--kmm-warm, 0.2);
+          pointer-events: none;
+        }
+        /* Traveling light pulse that sweeps the filled portion at high momentum. */
+        .kmm-sweep {
+          position: absolute;
+          top: 0;
+          bottom: 0;
+          left: 0;
+          width: 42%;
+          z-index: 2;
+          pointer-events: none;
+          opacity: var(--kmm-sweep-o, 0);
+          mix-blend-mode: screen;
+          background: linear-gradient(90deg,
+            transparent 0%,
+            rgba(255, 255, 255, 0.5) 45%,
+            rgba(var(--fx-gold), 0.65) 55%,
+            transparent 100%);
+          transform: translateX(-130%);
+          animation: kmm-sweep var(--kmm-sweep-dur, 3s) ease-in-out infinite;
+          will-change: transform;
         }
         .kmm-tip {
           position: absolute;
           top: 50%;
-          right: -1px;
+          right: 0;
           width: 6px;
           height: 6px;
           border-radius: 50%;
           transform: translateY(-50%);
           filter: blur(0.5px);
           opacity: 0.9;
+          z-index: 3;
+        }
+        @keyframes kmm-flow {
+          0% { background-position: 0% 50%; }
+          100% { background-position: 280% 50%; }
+        }
+        @keyframes kmm-sweep {
+          0% { transform: translateX(-130%); }
+          100% { transform: translateX(320%); }
         }
         @keyframes kmm-breathe {
-          0%, 100% { filter: brightness(1); }
-          50% { filter: brightness(1.14); }
+          0%, 100% { filter: brightness(1) saturate(1); }
+          50% { filter: brightness(1.14) saturate(1.12); }
         }
         @media (prefers-reduced-motion: reduce) {
           .kmm-fill {
             animation: none;
-            transition: width 400ms ease, background 400ms ease;
+            background-position: 40% 50%;
+            transition: width 400ms ease, opacity 400ms ease;
+          }
+          .kmm-sweep {
+            animation: none;
+            opacity: 0;
           }
         }
       `}</style>

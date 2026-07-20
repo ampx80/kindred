@@ -4,6 +4,11 @@
 // shareable card with native share / clipboard fallbacks. No cross-agent imports.
 import { useEffect, useState, useCallback } from 'react';
 import { useToast } from './UI.jsx';
+import FxBackdrop from './FxBackdrop.jsx';
+
+const REDUCED = () =>
+  typeof window !== 'undefined' && window.matchMedia &&
+  window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const KINDRED_URL = 'https://kindred-weld-five.vercel.app';
 
@@ -84,6 +89,8 @@ export default function ShareCard() {
 
   if (!data) return null;
 
+  const reduced = REDUCED();
+
   return (
     <div
       className="kshr-scrim"
@@ -106,33 +113,57 @@ export default function ShareCard() {
           animation: kshrPop .34s cubic-bezier(.2,.8,.25,1) both;
         }
         .kshr-card {
+          --fx-glow: 250,138,74;
           position: relative; overflow: hidden;
           border-radius: 24px; padding: 2.4rem 1.8rem 1.6rem;
           text-align: center; color: var(--ink);
-          border: 1px solid var(--line);
           background:
-            radial-gradient(120% 90% at 20% 0%, var(--gold-bg) 0%, transparent 55%),
-            radial-gradient(130% 100% at 85% 8%, var(--rose-bg) 0%, transparent 52%),
-            linear-gradient(160deg, var(--accent-50) 0%, var(--paper) 48%, var(--gold-bg) 118%);
-          box-shadow: 0 24px 60px -18px rgba(120,70,40,.5);
+            radial-gradient(120% 90% at 20% 0%, rgba(255,244,230,.72) 0%, transparent 55%),
+            radial-gradient(130% 100% at 85% 8%, rgba(255,232,238,.55) 0%, transparent 52%),
+            linear-gradient(160deg, rgba(255,246,236,.66) 0%, rgba(255,251,246,.5) 48%, rgba(255,236,214,.62) 118%);
+          box-shadow:
+            0 28px 70px -18px rgba(120,70,40,.55),
+            0 0 0 1px rgba(255,255,255,.35) inset,
+            0 0 40px -6px rgba(250,138,74,.28);
         }
         .kshr-card::before {
-          content: ''; position: absolute; inset: 0; pointer-events: none;
+          content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 1;
           background: radial-gradient(80% 60% at 50% -10%, rgba(255,255,255,.7), transparent 70%);
-          opacity: .6;
+          opacity: .55;
         }
-        .kshr-inner { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; }
+        .kshr-inner { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; }
         .kshr-orb-wrap { position: relative; margin-bottom: 1.25rem; }
+        .kshr-orb-halo {
+          position: absolute; left: 50%; top: 50%; width: 150px; height: 150px;
+          transform: translate(-50%,-50%); border-radius: 50%; pointer-events: none; z-index: 0;
+          background: radial-gradient(circle, rgba(250,138,74,.45), rgba(233,120,160,.22) 45%, transparent 70%);
+          filter: blur(8px); animation: kshrHalo 4.2s ease-in-out infinite;
+        }
         .kshr-emoji {
           position: absolute; inset: 0; display: grid; place-items: center;
-          font-size: 2rem; z-index: 2; filter: drop-shadow(0 2px 4px rgba(70,40,25,.35));
+          font-size: 2rem; z-index: 2; filter: drop-shadow(0 2px 6px rgba(70,40,25,.4));
+        }
+        .kshr-stat-stack {
+          position: relative; display: inline-block;
+          margin: .2rem 0 .1rem; overflow-wrap: anywhere; z-index: 0;
         }
         .kshr-stat {
+          position: relative; z-index: 1; display: block;
           font-family: var(--font-display); font-weight: 700;
-          font-size: clamp(3.4rem, 15vw, 5rem); line-height: .96;
-          letter-spacing: -.03em; color: var(--accent-700);
-          font-variant-numeric: tabular-nums; margin: .2rem 0 .1rem;
-          overflow-wrap: anywhere;
+          font-size: clamp(3.6rem, 16vw, 5.4rem); line-height: .94;
+          letter-spacing: -.03em;
+          font-variant-numeric: tabular-nums;
+        }
+        .kshr-stat-bloom {
+          position: absolute; inset: 0; z-index: 0; pointer-events: none;
+          font-family: var(--font-display); font-weight: 700;
+          font-size: clamp(3.6rem, 16vw, 5.4rem); line-height: .94;
+          letter-spacing: -.03em; font-variant-numeric: tabular-nums;
+          background: var(--fx-holo); background-size: 300% 100%;
+          -webkit-background-clip: text; background-clip: text;
+          color: transparent; -webkit-text-fill-color: transparent;
+          filter: blur(15px) saturate(150%); opacity: .8;
+          animation: fx-holo-shift 6s linear infinite;
         }
         .kshr-title {
           font-family: var(--font-display); font-weight: 600;
@@ -144,8 +175,8 @@ export default function ShareCard() {
           margin: .55rem auto 0; max-width: 30ch;
         }
         .kshr-rule {
-          width: 46px; height: 3px; border-radius: 3px; margin: 1.5rem auto .95rem;
-          background: linear-gradient(90deg, var(--accent), var(--gold));
+          width: 60px; height: 3px; border-radius: 3px; margin: 1.5rem auto .95rem;
+          box-shadow: 0 0 12px rgba(var(--fx-glow), .5);
         }
         .kshr-mark {
           display: inline-flex; align-items: center; gap: .5rem;
@@ -159,26 +190,40 @@ export default function ShareCard() {
         }
         .kshr-actions { display: flex; gap: .7rem; }
         .kshr-actions .btn { flex: 1; justify-content: center; }
+        .kshr-btn { position: relative; z-index: 1; border-radius: 14px; }
         @keyframes kshrScrim { from { opacity: 0; } to { opacity: 1; } }
         @keyframes kshrPop { from { opacity: 0; transform: translateY(16px) scale(.96); } to { opacity: 1; transform: none; } }
+        @keyframes kshrHalo {
+          0%, 100% { opacity: .7; transform: translate(-50%,-50%) scale(1); }
+          50% { opacity: 1; transform: translate(-50%,-50%) scale(1.12); }
+        }
         @media (prefers-reduced-motion: reduce) {
-          .kshr-scrim, .kshr-shell { animation: none !important; }
+          .kshr-scrim, .kshr-shell, .kshr-orb-halo, .kshr-stat-bloom { animation: none !important; }
         }
       `}</style>
 
       <div className="kshr-shell" onClick={(e) => e.stopPropagation()}>
-        <div className="kshr-card">
+        <div className={`kshr-card fx-glass fx-ring fx-tilt${reduced ? '' : ' fx-shimmer'}`}>
+          {/* Holographic collectible scene: drifting aurora + rising particle motes. */}
+          <FxBackdrop density={38} glow="250,138,74" style={{ opacity: 0.5 }} />
+
           <div className="kshr-inner">
-            <div className="kshr-orb-wrap">
+            <div className={`kshr-orb-wrap${reduced ? '' : ' fx-float'}`}>
+              <span className="kshr-orb-halo" aria-hidden />
               <span className="aria-orb" style={{ width: 72, height: 72, display: 'block' }} aria-hidden />
               {data.emoji && <span className="kshr-emoji" aria-hidden>{data.emoji}</span>}
             </div>
 
-            {data.stat && <div className="kshr-stat">{data.stat}</div>}
+            {data.stat && (
+              <div className="kshr-stat-stack" aria-label={data.stat}>
+                <span className="kshr-stat-bloom" aria-hidden>{data.stat}</span>
+                <span className="kshr-stat fx-holo-text fx-neon-text" aria-hidden>{data.stat}</span>
+              </div>
+            )}
             <h2 className="kshr-title">{data.title}</h2>
             <p className="kshr-sub">{data.subtitle}</p>
 
-            <div className="kshr-rule" aria-hidden />
+            <div className="kshr-rule fx-holo-fill" aria-hidden />
             <span className="kshr-mark">
               <span className="dot" aria-hidden />
               Kindred
@@ -187,8 +232,8 @@ export default function ShareCard() {
         </div>
 
         <div className="kshr-actions">
-          <button type="button" className="btn btn-ghost" onClick={close}>Close</button>
-          <button type="button" className="btn btn-primary" onClick={doShare}>Share</button>
+          <button type="button" className="btn btn-ghost fx-glass kshr-btn" onClick={close}>Close</button>
+          <button type="button" className={`btn btn-primary fx-neon kshr-btn${reduced ? '' : ' fx-neon-breathe'}`} onClick={doShare}>Share</button>
         </div>
       </div>
     </div>

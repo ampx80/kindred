@@ -11,10 +11,21 @@ import { sChime, sSuccess } from '../lib/sound.js';
 import * as sfx from '../lib/sound.js';
 import { haptic } from '../lib/haptics.js';
 import { burstFrom } from '../lib/celebrate.js';
+import FxBackdrop from './FxBackdrop.jsx';
 
 const DISMISS_MS = 4500;
 const DISMISS_MS_LEGENDARY = 6500;
 const EXIT_MS = 420;
+
+// Rarity -> r,g,b glow triplet so the holo ring, neon glow, tinted edge and
+// legendary particle field all recolor per rarity via --fx-glow. Kept warm and
+// on-brand (sage / sky / amber / gold) rather than cold sci-fi hues.
+const RARITY_GLOW = {
+  common: '150,180,130',
+  rare: '120,175,230',
+  epic: '250,138,74',
+  legendary: '245,190,110',
+};
 
 export default function AchievementToast() {
   const [queue, setQueue] = useState([]);
@@ -95,6 +106,9 @@ export default function AchievementToast() {
 
   const rarityKey = RARITY[current.rarity] ? current.rarity : 'common';
   const r = RARITY[rarityKey];
+  const glow = RARITY_GLOW[rarityKey] || RARITY_GLOW.common;
+  const isHi = rarityKey === 'epic' || rarityKey === 'legendary';
+  const isLegendary = rarityKey === 'legendary';
 
   const onOpen = () => {
     try { haptic('light'); } catch {}
@@ -129,6 +143,8 @@ export default function AchievementToast() {
             padding: 0;
           }
         }
+        /* Glass card: translucent glass (via .fx-glass) with a rarity-tinted
+           edge, layered warm depth shadow, and a holo glow bloom. */
         .achv-toast {
           pointer-events: auto;
           position: relative;
@@ -139,9 +155,12 @@ export default function AchievementToast() {
           gap: 14px;
           padding: 14px 15px;
           border-radius: var(--r-md, 16px);
-          background: var(--paper, #fff);
-          border: 1px solid var(--line, #eadfd3);
-          box-shadow: 0 18px 44px -12px rgba(60, 40, 20, 0.30), 0 4px 12px -4px rgba(60, 40, 20, 0.16);
+          border: 1px solid rgba(var(--fx-glow), 0.30);
+          box-shadow:
+            0 1px 0 rgba(255, 255, 255, 0.35) inset,
+            0 18px 44px -12px rgba(60, 40, 20, 0.30),
+            0 4px 12px -4px rgba(60, 40, 20, 0.16),
+            0 0 26px -6px rgba(var(--fx-glow), 0.30);
           cursor: pointer;
           overflow: hidden;
           text-align: left;
@@ -150,26 +169,56 @@ export default function AchievementToast() {
           transition: transform 440ms cubic-bezier(0.16, 1, 0.3, 1), opacity 320ms ease;
           will-change: transform, opacity;
         }
+        /* Rarity-tinted holo edge bar, glowing. */
         .achv-toast::before {
           content: '';
           position: absolute;
           top: 0; left: 0; bottom: 0;
           width: 4px;
-          background: var(--achv-color, var(--accent-600));
+          z-index: 3;
+          background: linear-gradient(180deg, rgb(var(--fx-glow)), rgba(var(--fx-glow), 0.35));
+          box-shadow: 0 0 12px rgba(var(--fx-glow), 0.6);
         }
         .achv-toast.in { transform: translateY(0) scale(1); opacity: 1; }
         .achv-toast.out { transform: translateY(14px) scale(0.985); opacity: 0; }
 
+        /* Higher rarities: stronger holographic bloom around the whole card. */
+        .achv-toast.achv-hi {
+          box-shadow:
+            0 1px 0 rgba(255, 255, 255, 0.42) inset,
+            0 20px 50px -12px rgba(60, 40, 20, 0.34),
+            0 4px 12px -4px rgba(60, 40, 20, 0.16),
+            0 0 40px -4px rgba(var(--fx-glow), 0.46);
+        }
+
+        /* Crisp diagonal entrance highlight (layers over the ambient .fx-shimmer
+           sweep for a richer holographic pass). */
         .achv-shine {
           position: absolute;
           top: 0; bottom: 0;
           left: -60%;
           width: 45%;
+          z-index: 1;
           background: linear-gradient(105deg, transparent 0%, rgba(255,255,255,0.55) 50%, transparent 100%);
           transform: skewX(-18deg);
           pointer-events: none;
         }
         .achv-toast.in .achv-shine { animation: achv-sweep 1500ms ease-in-out 260ms 1 both; }
+
+        /* Brief rarity-tinted scanline for epic/legendary. */
+        .achv-scan {
+          position: absolute;
+          left: 0; right: 0; top: 0;
+          height: 36%;
+          z-index: 1;
+          pointer-events: none;
+          background: linear-gradient(180deg, rgba(var(--fx-glow), 0.28), transparent);
+          transform: translateY(-120%);
+          opacity: 0;
+        }
+        .achv-toast.in .achv-scan {
+          animation: achv-scanline 2600ms cubic-bezier(0.22, 1, 0.36, 0.68) 340ms 2 both;
+        }
 
         .achv-icon {
           flex: 0 0 auto;
@@ -178,12 +227,30 @@ export default function AchievementToast() {
           display: flex; align-items: center; justify-content: center;
           color: var(--achv-color, var(--accent-600));
           background: var(--achv-bg, var(--accent-50));
-          box-shadow: inset 0 0 0 1.5px var(--achv-color, var(--accent-600));
+          box-shadow:
+            inset 0 0 0 1.5px var(--achv-color, var(--accent-600)),
+            0 0 14px rgba(var(--fx-glow), 0.45),
+            0 0 34px rgba(var(--fx-glow), 0.26);
           position: relative;
+          z-index: 2;
+        }
+        /* Recolor the rotating conic .fx-ring per rarity via --fx-glow, keeping
+           a whisper of iridescence so the badge reads holographic, not flat. */
+        .achv-icon.fx-ring::before {
+          background: conic-gradient(
+            from 0deg,
+            rgb(var(--fx-glow)),
+            rgb(var(--fx-magenta)),
+            rgb(var(--fx-glow)),
+            rgb(var(--fx-cyan)),
+            rgb(var(--fx-gold)),
+            rgb(var(--fx-glow))
+          );
+          opacity: 0.95;
         }
         .achv-toast.in .achv-icon { animation: achv-pop 620ms cubic-bezier(0.34, 1.56, 0.64, 1) 120ms both; }
 
-        .achv-body { flex: 1 1 auto; min-width: 0; }
+        .achv-body { flex: 1 1 auto; min-width: 0; position: relative; z-index: 2; }
         .achv-rarity {
           display: inline-flex;
           align-items: center;
@@ -199,8 +266,8 @@ export default function AchievementToast() {
           content: '';
           width: 6px; height: 6px;
           border-radius: 50%;
-          background: var(--achv-color, var(--accent-600));
-          box-shadow: 0 0 6px var(--achv-color, var(--accent-600));
+          background: rgb(var(--fx-glow));
+          box-shadow: 0 0 6px rgba(var(--fx-glow), 0.9);
         }
         .achv-name {
           font-family: var(--font-display, inherit);
@@ -212,6 +279,7 @@ export default function AchievementToast() {
           overflow: hidden;
           text-overflow: ellipsis;
         }
+        .achv-toast.achv-hi .achv-name { font-size: 16.5px; }
         .achv-desc {
           font-size: 12.5px;
           line-height: 1.35;
@@ -232,12 +300,20 @@ export default function AchievementToast() {
           cursor: pointer;
           transition: background 160ms ease, color 160ms ease;
           align-self: flex-start;
+          position: relative;
+          z-index: 2;
         }
         .achv-close:hover { background: var(--n-100, #f2ece4); color: var(--n-600, #6a5c4e); }
 
         @keyframes achv-sweep {
           0% { left: -60%; }
           100% { left: 130%; }
+        }
+        @keyframes achv-scanline {
+          0% { transform: translateY(-120%); opacity: 0; }
+          12% { opacity: 1; }
+          88% { opacity: 1; }
+          100% { transform: translateY(320%); opacity: 0; }
         }
         @keyframes achv-pop {
           0% { transform: scale(0.4) rotate(-14deg); opacity: 0; }
@@ -253,28 +329,32 @@ export default function AchievementToast() {
           .achv-toast.out { transform: none; }
           .achv-toast.in .achv-shine { animation: none; }
           .achv-toast.in .achv-icon { animation: none; }
+          .achv-toast.in .achv-scan { animation: none; }
           .achv-shine { display: none; }
+          .achv-scan { display: none; }
         }
       `}</style>
 
       <div className="achv-toast-wrap">
         <div
           ref={cardRef}
-          className={`achv-toast${shown ? ' in' : ''}${leaving ? ' out' : ''}`}
-          style={{ '--achv-color': r.color, '--achv-bg': r.bg }}
+          className={`achv-toast fx-glass fx-shimmer${isHi ? ' achv-hi' : ''}${isLegendary ? ' achv-legendary' : ''}${shown ? ' in' : ''}${leaving ? ' out' : ''}`}
+          style={{ '--achv-color': r.color, '--achv-bg': r.bg, '--fx-glow': glow }}
           onClick={onOpen}
           role="button"
           tabIndex={0}
           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); } }}
           aria-label={`Achievement unlocked: ${current.name}. ${current.desc}. Open achievements.`}
         >
+          {isLegendary && <FxBackdrop density={24} glow={glow} />}
           <span className="achv-shine" aria-hidden />
-          <div className="achv-icon">
+          {isHi && <span className="achv-scan" aria-hidden />}
+          <div className="achv-icon fx-ring">
             <Icon name={current.icon || 'trophy'} size={24} />
           </div>
           <div className="achv-body">
             <div className="achv-rarity">{r.label} unlocked</div>
-            <div className="achv-name">{current.name}</div>
+            <div className={`achv-name${isHi ? ' fx-holo-text' : ' fx-neon-text'}`}>{current.name}</div>
             <div className="achv-desc">{current.desc}</div>
           </div>
           <button className="achv-close" onClick={onDismiss} aria-label="Dismiss">

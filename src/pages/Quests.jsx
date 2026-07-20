@@ -13,6 +13,7 @@ import { sSuccess, sTap } from '../lib/sound.js';
 import { haptic } from '../lib/haptics.js';
 import { celebrate, burstFrom } from '../lib/celebrate.js';
 import { track } from '../lib/track.js';
+import FxBackdrop from '../components/FxBackdrop.jsx';
 
 const DEFS = {};
 for (const q of [...DAILY_QUEST_POOL, ...WEEKLY_QUEST_POOL]) DEFS[q.id] = q;
@@ -36,7 +37,7 @@ function weeklyResetLabel(now) {
   return `resets Monday, in ${daysToMon} days`;
 }
 
-function QuestCard({ item, def, onClaim }) {
+function QuestCard({ item, def, onClaim, index = 0 }) {
   const target = Math.max(1, def.target || 1);
   const progress = Math.min(target, item.progress || 0);
   const pct = Math.round((progress / target) * 100);
@@ -45,7 +46,10 @@ function QuestCard({ item, def, onClaim }) {
   const state = claimed ? 'claimed' : claimable ? 'ready' : 'active';
 
   return (
-    <div className={`qstx-card qstx-card--${state}`}>
+    <div
+      className={`qstx-card qstx-card--${state} fx-glass${claimable ? ' fx-ring' : ''}`}
+      style={{ '--qstx-i': `${Math.min(index, 8) * 70}ms` }}
+    >
       <div className="qstx-card__top">
         <span className="qstx-chip" aria-hidden>
           <Icon name={def.icon || 'sparkles'} size={20} />
@@ -62,7 +66,7 @@ function QuestCard({ item, def, onClaim }) {
           <p className="qstx-card__desc">{def.desc}</p>
 
           <div className="qstx-bar" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={target}>
-            <i style={{ width: `${pct}%` }} />
+            <i className="fx-holo-fill" style={{ width: `${pct}%` }} />
           </div>
           <div className="qstx-meta">
             <span className="qstx-count">{progress}<span className="muted">/{target}</span></span>
@@ -75,7 +79,7 @@ function QuestCard({ item, def, onClaim }) {
       </div>
 
       {claimable && (
-        <button type="button" className="btn btn-primary qstx-claim" onClick={(e) => onClaim(e, item.id)}>
+        <button type="button" className="btn btn-primary qstx-claim fx-neon fx-neon-breathe" onClick={(e) => onClaim(e, item.id)}>
           <Icon name="sparkles" size={17} /> Claim reward
         </button>
       )}
@@ -112,8 +116,8 @@ function QuestSection({ eyebrow, title, note, list, onClaim, emptyBody }) {
         </div>
       ) : (
         <div className="qstx-grid">
-          {items.map(({ it, def }) => (
-            <QuestCard key={it.id} item={it} def={def} onClaim={onClaim} />
+          {items.map(({ it, def }, i) => (
+            <QuestCard key={it.id} item={it} def={def} onClaim={onClaim} index={i} />
           ))}
         </div>
       )}
@@ -163,18 +167,25 @@ export default function Quests() {
   const css = `
     .qstx { max-width: 900px; margin: 0 auto; padding: 1.4rem 1.15rem 120px; }
 
-    .qstx-hero { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.6rem; }
-    .qstx-hero__orb { width: 52px; height: 52px; }
+    /* Header becomes a holographic console banner: subtle aurora behind a
+       frosted-glass panel, with an iridescent title. */
+    .qstx-hero {
+      position: relative; overflow: hidden;
+      display: flex; align-items: center; gap: 1rem; margin-bottom: 1.6rem;
+      padding: 1.15rem 1.3rem; border-radius: var(--r-lg, 20px);
+    }
+    .qstx-hero__orb { position: relative; z-index: 1; width: 52px; height: 52px; }
+    .qstx-hero__txt { position: relative; z-index: 1; min-width: 0; }
     .qstx-hero__title { margin: 0; font-family: var(--font-display, inherit); font-size: clamp(1.9rem, 5vw, 2.5rem); line-height: 1.05; }
     .qstx-hero__sub { margin: .3rem 0 0; }
     .qstx-hero__reset { display: inline-flex; align-items: center; gap: .35rem; margin-top: .35rem; font-size: .82rem; }
 
     .qstx-callout {
+      position: relative;
       display: flex; align-items: center; gap: .7rem; margin-bottom: 1.6rem;
       padding: .85rem 1.05rem; border-radius: var(--r-md, 14px);
-      background: linear-gradient(180deg, var(--gold-bg), var(--paper));
-      border: 1px solid var(--gold);
     }
+    .qstx-callout > * { position: relative; z-index: 1; }
     .qstx-callout__ico { width: 38px; height: 38px; border-radius: 12px; background: var(--gold-bg); color: var(--gold); flex: none; }
 
     .qstx-section { margin-bottom: 2rem; }
@@ -185,13 +196,30 @@ export default function Quests() {
 
     .qstx-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; }
 
+    /* Quest cards: frosted glass panels that rise in with a stagger, with a
+       light sweep on hover. Glass background comes from .fx-glass. */
     .qstx-card {
       position: relative; display: flex; flex-direction: column; gap: .9rem;
       padding: 1.15rem; border-radius: var(--r-md, 14px);
-      background: var(--paper); border: 1px solid var(--line);
       transition: transform .18s var(--ease, ease), box-shadow .18s var(--ease, ease), border-color .18s var(--ease, ease);
+      animation: qstx-rise 560ms var(--fx-ease, ease) both;
+      animation-delay: var(--qstx-i, 0ms);
     }
+    .qstx-card::after {
+      content: ""; position: absolute; inset: 0; border-radius: inherit;
+      clip-path: inset(0 round var(--r-md, 14px));
+      background: linear-gradient(115deg, transparent 38%, rgba(255, 255, 255, .5) 50%, transparent 62%);
+      transform: translateX(-130%); opacity: 0; pointer-events: none; z-index: 0;
+    }
+    .qstx-card:hover::after { animation: qstx-sweep 900ms var(--fx-ease, ease); }
+    @keyframes qstx-sweep {
+      0% { transform: translateX(-130%); opacity: 0; }
+      18% { opacity: 1; }
+      100% { transform: translateX(130%); opacity: 0; }
+    }
+    @keyframes qstx-rise { 0% { opacity: 0; transform: translateY(16px); } 100% { opacity: 1; transform: translateY(0); } }
     .qstx-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); border-color: var(--line-strong); }
+    .qstx-card__top, .qstx-claim, .qstx-hint { position: relative; z-index: 1; }
     .qstx-card__top { display: flex; gap: .85rem; align-items: flex-start; }
     .qstx-card__body { min-width: 0; flex: 1; }
     .qstx-card__head { display: flex; align-items: center; gap: .5rem; }
@@ -203,10 +231,16 @@ export default function Quests() {
       border-radius: 13px; background: var(--accent-50); color: var(--accent-600);
     }
 
-    .qstx-bar { height: 8px; border-radius: var(--r-pill, 999px); background: var(--n-100); overflow: hidden; }
+    .qstx-bar {
+      position: relative; height: 8px; border-radius: var(--r-pill, 999px); overflow: hidden;
+      background: rgba(var(--fx-ink), .08);
+      box-shadow: inset 0 1px 2px rgba(var(--fx-ink), .12);
+    }
+    /* Iridescent .fx-holo-fill supplies the moving holo gradient; we keep the
+       geometry + animated width and add a soft neon lip. */
     .qstx-bar > i {
       display: block; height: 100%; border-radius: inherit;
-      background: linear-gradient(90deg, var(--accent-300), var(--accent-600));
+      box-shadow: 0 0 10px rgba(var(--fx-glow), .5), 0 0 2px rgba(var(--fx-glow), .6);
       transition: width .6s var(--ease, ease);
     }
     .qstx-meta { display: flex; align-items: center; justify-content: space-between; gap: .6rem; margin-top: .6rem; flex-wrap: wrap; }
@@ -224,18 +258,25 @@ export default function Quests() {
 
     .qstx-hint { display: inline-flex; align-items: center; gap: .35rem; }
 
-    .qstx-claim { width: 100%; justify-content: center; gap: .45rem; }
-
-    /* Ready to claim: the card glows and lifts to pull the eye. */
-    .qstx-card--ready {
-      border-color: var(--accent-300);
-      background: linear-gradient(180deg, var(--accent-50), var(--paper));
-      box-shadow: 0 0 0 1px var(--accent-300), 0 12px 30px -14px rgba(217, 107, 67, .5);
-      animation: qstxGlow 2.6s ease-in-out infinite;
+    /* Claim: glassy neon button that flashes hot on press. */
+    .qstx-claim { width: 100%; justify-content: center; gap: .45rem; overflow: hidden; }
+    .qstx-claim:active { animation: qstx-flash 460ms var(--fx-ease, ease); }
+    @keyframes qstx-flash {
+      0% { box-shadow: 0 0 0 0 rgba(var(--fx-amber), 0); filter: brightness(1); }
+      30% { box-shadow: 0 0 0 6px rgba(var(--fx-amber), .35), 0 0 44px rgba(var(--fx-amber), .8); filter: brightness(1.28); }
+      100% { box-shadow: 0 0 0 0 rgba(var(--fx-amber), 0); filter: brightness(1); }
     }
-    @keyframes qstxGlow {
-      0%, 100% { box-shadow: 0 0 0 1px var(--accent-300), 0 12px 30px -16px rgba(217, 107, 67, .45); }
-      50% { box-shadow: 0 0 0 1px var(--accent-600), 0 16px 40px -14px rgba(217, 107, 67, .65); }
+
+    /* Ready to claim: the card glows hot with an iridescent .fx-ring + pulse. */
+    .qstx-card--ready {
+      border-color: rgba(var(--fx-amber), .5);
+      background: linear-gradient(180deg, rgba(var(--fx-amber), .14), rgba(var(--fx-glass), var(--fx-glass-a)));
+      animation: qstx-rise 560ms var(--fx-ease, ease) both, qstx-hot 2.6s ease-in-out infinite;
+      animation-delay: var(--qstx-i, 0ms), 0ms;
+    }
+    @keyframes qstx-hot {
+      0%, 100% { box-shadow: 0 0 0 1px rgba(var(--fx-amber), .4), 0 10px 30px -14px rgba(var(--fx-amber), .5), 0 0 22px rgba(var(--fx-amber), .18); }
+      50% { box-shadow: 0 0 0 1px rgba(var(--fx-amber), .7), 0 16px 42px -12px rgba(var(--fx-amber), .7), 0 0 40px rgba(var(--fx-amber), .34); }
     }
 
     /* Claimed: calm, quiet, settled. */
@@ -259,7 +300,6 @@ export default function Quests() {
     .qstx-flink {
       display: flex; align-items: center; gap: .85rem; text-decoration: none; color: inherit;
       padding: 1.05rem 1.15rem; border-radius: var(--r-md, 14px);
-      background: var(--paper); border: 1px solid var(--line);
       transition: transform .18s var(--ease, ease), box-shadow .18s var(--ease, ease), border-color .18s var(--ease, ease);
     }
     .qstx-flink:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); border-color: var(--accent-300); }
@@ -273,7 +313,8 @@ export default function Quests() {
     @media (prefers-reduced-motion: reduce) {
       .qstx-card, .qstx-flink { transition: none; }
       .qstx-card:hover, .qstx-flink:hover { transform: none; }
-      .qstx-card--ready { animation: none; }
+      .qstx-card, .qstx-card--ready, .qstx-claim { animation: none !important; }
+      .qstx-card::after { display: none; }
       .qstx-bar > i { transition: none; }
     }
   `;
@@ -282,16 +323,17 @@ export default function Quests() {
     <div className="qstx">
       <style>{css}</style>
 
-      <header className="qstx-hero">
+      <header className="qstx-hero fx-glass">
+        <FxBackdrop density={18} glow="250,138,74" style={{ opacity: .7 }} />
         <span className="aria-orb qstx-hero__orb" aria-hidden />
-        <div style={{ minWidth: 0 }}>
-          <h1 className="qstx-hero__title">Quests</h1>
+        <div className="qstx-hero__txt">
+          <h1 className="qstx-hero__title fx-holo-text">Quests</h1>
           <p className="qstx-hero__sub muted">{subline}</p>
         </div>
       </header>
 
       {claimable > 0 && (
-        <div className="qstx-callout">
+        <div className="qstx-callout fx-glass fx-neon fx-shimmer">
           <span className="row center qstx-callout__ico" aria-hidden>
             <Icon name="sparkles" size={20} />
           </span>
@@ -323,7 +365,7 @@ export default function Quests() {
       />
 
       <div className="qstx-footer">
-        <Link to="/rewards" className="qstx-flink" onClick={() => sTap()}>
+        <Link to="/rewards" className="qstx-flink fx-glass" onClick={() => sTap()}>
           <span className="qstx-flink__ico qstx-flink__ico--spark" aria-hidden><Icon name="sparkles" size={20} /></span>
           <span className="col" style={{ gap: '.15rem', minWidth: 0 }}>
             <span className="qstx-flink__label">Spend your sparks</span>
@@ -332,7 +374,7 @@ export default function Quests() {
           <span className="qstx-flink__arrow" aria-hidden><Icon name="chevronRight" size={18} /></span>
         </Link>
 
-        <Link to="/achievements" className="qstx-flink" onClick={() => sTap()}>
+        <Link to="/achievements" className="qstx-flink fx-glass" onClick={() => sTap()}>
           <span className="qstx-flink__ico qstx-flink__ico--ach" aria-hidden><Icon name="trophy" size={20} /></span>
           <span className="col" style={{ gap: '.15rem', minWidth: 0 }}>
             <span className="qstx-flink__label">See achievements</span>
